@@ -23,6 +23,9 @@ Archive.zig supports embedded and bare metal targets:
 - **WebAssembly** (wasm32, wasm64)
 - **Bare metal** (freestanding)
 
+> [!NOTE]
+> On freestanding and WebAssembly targets, **zstd** and **brotli** are automatically disabled because they require C standard library headers (`string.h`, `stdlib.h`) that are not available without an operating system. The remaining 8 algorithms (gzip, zlib, deflate, lz4, lzma, xz, tar.gz, zip) work fully on all platforms including bare metal. You can override this with `-Dzstd=true -Dbrotli=true` in your build command if you provide your own C standard library.
+
 ## Platform-Specific Optimizations
 
 ### Windows Optimizations

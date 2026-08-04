@@ -109,7 +109,10 @@ Archive.zig supports a wide range of platforms and architectures:
 | **Windows** | x86_64, x86 | Full support |
 | **Linux** | x86_64, x86, aarch64 | Full support |
 | **macOS** | x86_64, aarch64 (Apple Silicon) | Full support |
-| **Bare Metal / Freestanding** | x86_64, aarch64, arm, riscv64 | Full support |
+| **Bare Metal / Freestanding** | x86_64, aarch64, arm, riscv64, wasm32 | 8 algorithms (see note) |
+
+> [!NOTE]
+> On freestanding and WebAssembly targets, **zstd** and **brotli** are automatically disabled because they require C standard library headers (`string.h`, `stdlib.h`) that are not available without an operating system. The remaining 8 algorithms (gzip, zlib, deflate, lz4, lzma, xz, tar.gz, zip) work fully on all platforms. You can override this with `-Dzstd=true -Dbrotli=true` if you provide your own C standard library.
 
 ---
 
