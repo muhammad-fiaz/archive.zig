@@ -1,5 +1,6 @@
 const std = @import("std");
 const config = @import("config.zig");
+const build_options = @import("build_options");
 
 fn dispatchCompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, options: config.Options, data: []const u8) ![]u8 {
     const algorithms = @import("archive.zig").algorithms;
@@ -13,10 +14,22 @@ fn dispatchCompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, o
         .xz => algorithms.xz.compress(allocator, data, options),
         .tar_gz => algorithms.tar_gz.compress(allocator, data, options),
         .zip => algorithms.zip.compress(allocator, data, options),
-        .zstd => algorithms.zstd.compress(allocator, data, options),
+        .zstd => {
+            if (comptime build_options.zstd_enabled) {
+                return algorithms.zstd.compress(allocator, data, options);
+            } else {
+                return error.UnsupportedAlgorithm;
+            }
+        },
         .raw_deflate => algorithms.deflate.compress(allocator, data, options),
         .lzma2 => algorithms.lzma.compress(allocator, data, options),
-        .brotli => algorithms.brotli.compress(allocator, data, options),
+        .brotli => {
+            if (comptime build_options.brotli_enabled) {
+                return algorithms.brotli.compress(allocator, data, options);
+            } else {
+                return error.UnsupportedAlgorithm;
+            }
+        },
     };
 }
 
@@ -32,10 +45,22 @@ fn dispatchDecompress(allocator: std.mem.Allocator, algorithm: config.Algorithm,
         .xz => algorithms.xz.decompress(allocator, data, options),
         .tar_gz => algorithms.tar_gz.decompress(allocator, data, options),
         .zip => algorithms.zip.decompress(allocator, data, options),
-        .zstd => algorithms.zstd.decompress(allocator, data, options),
+        .zstd => {
+            if (comptime build_options.zstd_enabled) {
+                return algorithms.zstd.decompress(allocator, data, options);
+            } else {
+                return error.UnsupportedAlgorithm;
+            }
+        },
         .raw_deflate => algorithms.deflate.decompress(allocator, data, options),
         .lzma2 => algorithms.lzma.decompress(allocator, data, options),
-        .brotli => algorithms.brotli.decompress(allocator, data, options),
+        .brotli => {
+            if (comptime build_options.brotli_enabled) {
+                return algorithms.brotli.decompress(allocator, data, options);
+            } else {
+                return error.UnsupportedAlgorithm;
+            }
+        },
     };
 }
 

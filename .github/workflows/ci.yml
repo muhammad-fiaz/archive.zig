@@ -32,25 +32,19 @@ jobs:
       - name: Build library (ReleaseFast)
         run: zig build -Doptimize=ReleaseFast
 
-      - name: Run all examples (skipped here — run in matrix job)
-        run: echo "Examples are tested in a dedicated matrix job on Linux and macOS runners"
+      - name: Run all examples
+        run: zig build run-all-examples
 
       - name: Zig format check
         run: zig fmt --check src/ examples/
 
   examples-run:
-    name: Run Examples Matrix (native targets)
+    name: Run Examples (${{ matrix.os }})
     needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-linux
-          - os: macos-latest
-            target: x86_64-macos
-          - os: windows-latest
-            target: x86_64-windows
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -62,14 +56,14 @@ jobs:
         with:
           version: 0.16.0
 
-      - name: Run Zig tests on ${{ matrix.target }}
+      - name: Run tests
         run: zig build test --summary all
 
-      - name: Run examples on ${{ matrix.target }}
+      - name: Run examples
         run: zig build run-all-examples
 
-  examples-build-only:
-    name: Build Examples / Library Matrix (build-only for many targets)
+  cross-build:
+    name: Cross Build (${{ matrix.target }})
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -82,12 +76,18 @@ jobs:
           - aarch64-macos
           - x86_64-windows
           - x86-windows
+          - aarch64-windows
           - riscv64-linux
           - riscv32-linux
           - powerpc64le-linux
           - mips64-linux
           - s390x-linux
           - arm-linux-gnueabihf
+          - x86_64-freestanding
+          - aarch64-freestanding
+          - riscv64-freestanding
+          - arm-freestanding
+          - wasm32-freestanding
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -99,5 +99,5 @@ jobs:
         with:
           version: 0.16.0
 
-      - name: Build for ${{ matrix.target }} (build-only)
+      - name: Build for ${{ matrix.target }}
         run: zig build -Dtarget=${{ matrix.target }} -Doptimize=Debug

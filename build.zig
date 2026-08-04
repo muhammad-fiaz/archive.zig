@@ -5,41 +5,54 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Resolve zstd dependency
-    const zstd_dep = b.dependency("zstd", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const zstd_mod = zstd_dep.module("zstd");
+    const is_freestanding = target.result.os.tag == .freestanding;
+    const is_wasm = target.result.cpu.arch == .wasm32 or target.result.cpu.arch == .wasm64 or target.result.os.tag == .wasi;
 
-    // Resolve brotli dependency
-    const brotli_dep = b.dependency("brotli", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const brotli_mod = brotli_dep.module("brotli");
+    const zstd_enabled = b.option(bool, "zstd", "Enable Zstandard support") orelse (!is_freestanding and !is_wasm);
+    const brotli_enabled = b.option(bool, "brotli", "Enable Brotli support") orelse (!is_freestanding and !is_wasm);
 
-    // Create the archive module with zstd and brotli support
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "zstd_enabled", zstd_enabled);
+    build_options.addOption(bool, "brotli_enabled", brotli_enabled);
+    const build_options_mod = build_options.createModule();
+
+    var zstd_mod: ?*std.Build.Module = null;
+    var brotli_mod: ?*std.Build.Module = null;
+
+    if (zstd_enabled) {
+        const zstd_dep = b.dependency("zstd", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        zstd_mod = zstd_dep.module("zstd");
+    }
+
+    if (brotli_enabled) {
+        const brotli_dep = b.dependency("brotli", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        brotli_mod = brotli_dep.module("brotli");
+    }
+
     const archive_module = b.createModule(.{
         .root_source_file = b.path("src/archive.zig"),
     });
-    archive_module.addImport("zstd", zstd_mod);
-    archive_module.addImport("brotli", brotli_mod);
+    archive_module.addImport("build_options", build_options_mod);
+    if (zstd_mod) |mod| archive_module.addImport("zstd", mod);
+    if (brotli_mod) |mod| archive_module.addImport("brotli", mod);
 
-    // Expose the module for external projects that depend on this package.
-    // This allows users to do: `const archive = @import("archive");` in their code
-    // after adding archive as a dependency and calling `dep.module("archive")` in their build.zig
     const exposed_module = b.addModule("archive", .{
         .root_source_file = b.path("src/archive.zig"),
     });
-    exposed_module.addImport("zstd", zstd_mod);
-    exposed_module.addImport("brotli", brotli_mod);
+    exposed_module.addImport("build_options", build_options_mod);
+    if (zstd_mod) |mod| exposed_module.addImport("zstd", mod);
+    if (brotli_mod) |mod| exposed_module.addImport("brotli", mod);
 
     const examples = [_]struct { name: []const u8, path: []const u8, skip_run_all: bool = false }{
         .{ .name = "main", .path = "examples/main.zig" },
     };
 
-    // Create run-all-examples step that runs all examples sequentially
     const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
     var previous_run_step: ?*std.Build.Step = null;
     var install_step: ?*std.Build.Step = null;
@@ -55,22 +68,20 @@ pub fn build(b: *std.Build) void {
             }),
         });
         exe.root_module.addImport("archive", archive_module);
+        exe.root_module.addImport("build_options", build_options_mod);
 
         const install_exe = b.addInstallArtifact(exe, .{});
         const example_step = b.step("example-" ++ example.name, "Build " ++ example.name ++ " example");
         example_step.dependOn(&install_exe.step);
         install_step = &install_exe.step;
 
-        // Add run step for each example
         const run_exe = b.addRunArtifact(exe);
         run_exe.step.dependOn(&install_exe.step);
         const run_step = b.step("run-" ++ example.name, "Run " ++ example.name ++ " example");
         run_step.dependOn(&run_exe.step);
 
         if (!example.skip_run_all) {
-            // Re-use the same executable artifact for run-all sequence
             const run_all_exe = b.addRunArtifact(exe);
-            // Make each run step depend on the previous run step to ensure sequential execution
             if (previous_run_step) |prev| {
                 run_all_exe.step.dependOn(prev);
             }
@@ -83,13 +94,11 @@ pub fn build(b: *std.Build) void {
             run_all_examples.dependOn(last);
         }
     } else {
-        // For cross-compilation, just build the examples
         if (install_step) |step| {
             run_all_examples.dependOn(step);
         }
     }
 
-    // Add a 'run' step that runs all examples
     const run_step = b.step("run", "Run examples");
     run_step.dependOn(run_all_examples);
 
@@ -101,13 +110,13 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    tests.root_module.addImport("zstd", zstd_mod);
-    tests.root_module.addImport("brotli", brotli_mod);
+    tests.root_module.addImport("build_options", build_options_mod);
+    if (zstd_mod) |mod| tests.root_module.addImport("zstd", mod);
+    if (brotli_mod) |mod| tests.root_module.addImport("brotli", mod);
 
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run unit tests");
 
-    // Only run tests if compatible with host
     if (target.result.os.tag == builtin.os.tag and target.result.cpu.arch == builtin.cpu.arch) {
         test_step.dependOn(&run_tests.step);
     } else {
@@ -115,7 +124,6 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&install_tests.step);
     }
 
-    // Docs generation
     const docs_step = b.step("docs", "Generate documentation");
     const docs_obj = b.addObject(.{
         .name = "archive",
@@ -125,8 +133,9 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    docs_obj.root_module.addImport("zstd", zstd_mod);
-    docs_obj.root_module.addImport("brotli", brotli_mod);
+    docs_obj.root_module.addImport("build_options", build_options_mod);
+    if (zstd_mod) |mod| docs_obj.root_module.addImport("zstd", mod);
+    if (brotli_mod) |mod| docs_obj.root_module.addImport("brotli", mod);
 
     const install_docs = b.addInstallDirectory(.{
         .source_dir = docs_obj.getEmittedDocs(),
@@ -135,14 +144,10 @@ pub fn build(b: *std.Build) void {
     });
     docs_step.dependOn(&install_docs.step);
 
-    // Create comprehensive test-all step that runs everything sequentially
     const test_all_step = b.step("test-all", "Run all tests and examples sequentially");
-    // First run unit tests
     test_all_step.dependOn(test_step);
-    // Then run all examples
     test_all_step.dependOn(run_all_examples);
 
-    // Install step for library
     const lib = b.addLibrary(.{
         .name = "archive",
         .linkage = .static,
@@ -152,7 +157,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    lib.root_module.addImport("zstd", zstd_mod);
-    lib.root_module.addImport("brotli", brotli_mod);
+    lib.root_module.addImport("build_options", build_options_mod);
+    if (zstd_mod) |mod| lib.root_module.addImport("zstd", mod);
+    if (brotli_mod) |mod| lib.root_module.addImport("brotli", mod);
     b.installArtifact(lib);
 }

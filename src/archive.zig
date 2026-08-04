@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 
 pub const config = @import("config.zig");
 pub const constants = @import("constants.zig");
@@ -15,8 +16,8 @@ pub const algorithms = struct {
     pub const xz = @import("algorithms/xz.zig");
     pub const zip = @import("algorithms/zip.zig");
     pub const zlib = @import("algorithms/zlib.zig");
-    pub const zstd = @import("algorithms/zstd.zig");
-    pub const brotli = @import("algorithms/brotli.zig");
+    pub const zstd = if (build_options.zstd_enabled) @import("algorithms/zstd.zig") else struct {};
+    pub const brotli = if (build_options.brotli_enabled) @import("algorithms/brotli.zig") else struct {};
 };
 
 pub const CompressionConfig = config.CompressionConfig;
@@ -51,10 +52,22 @@ pub const Archive = struct {
             .xz => algorithms.xz.compress(self.allocator, data, options),
             .tar_gz => algorithms.tar_gz.compress(self.allocator, data, options),
             .zip => algorithms.zip.compress(self.allocator, data, options),
-            .zstd => algorithms.zstd.compress(self.allocator, data, options),
+            .zstd => {
+                if (comptime build_options.zstd_enabled) {
+                    return algorithms.zstd.compress(self.allocator, data, options);
+                } else {
+                    return error.UnsupportedAlgorithm;
+                }
+            },
             .raw_deflate => algorithms.deflate.compress(self.allocator, data, options),
             .lzma2 => algorithms.lzma.compress(self.allocator, data, options),
-            .brotli => algorithms.brotli.compress(self.allocator, data, options),
+            .brotli => {
+                if (comptime build_options.brotli_enabled) {
+                    return algorithms.brotli.compress(self.allocator, data, options);
+                } else {
+                    return error.UnsupportedAlgorithm;
+                }
+            },
         };
     }
 
@@ -70,37 +83,44 @@ pub const Archive = struct {
             .xz => algorithms.xz.decompress(self.allocator, data, options),
             .tar_gz => algorithms.tar_gz.decompress(self.allocator, data, options),
             .zip => algorithms.zip.decompress(self.allocator, data, options),
-            .zstd => algorithms.zstd.decompress(self.allocator, data, options),
+            .zstd => {
+                if (comptime build_options.zstd_enabled) {
+                    return algorithms.zstd.decompress(self.allocator, data, options);
+                } else {
+                    return error.UnsupportedAlgorithm;
+                }
+            },
             .raw_deflate => algorithms.deflate.decompress(self.allocator, data, options),
             .lzma2 => algorithms.lzma.decompress(self.allocator, data, options),
-            .brotli => algorithms.brotli.decompress(self.allocator, data, options),
+            .brotli => {
+                if (comptime build_options.brotli_enabled) {
+                    return algorithms.brotli.decompress(self.allocator, data, options);
+                } else {
+                    return error.UnsupportedAlgorithm;
+                }
+            },
         };
     }
 };
 
-/// Compress data using the specified algorithm with default settings.
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, algorithm: Algorithm) ![]u8 {
     var archive = Archive.init(allocator, CompressionConfig.init(algorithm));
     defer archive.deinit();
     return archive.compress(data);
 }
 
-/// Decompress data using the specified algorithm.
-/// The algorithm must match the one used during compression.
 pub fn decompress(allocator: std.mem.Allocator, data: []const u8, algorithm: Algorithm) ![]u8 {
     var archive = Archive.init(allocator, CompressionConfig.init(algorithm));
     defer archive.deinit();
     return archive.decompress(data);
 }
 
-/// Compress data with full configuration options.
 pub fn compressWithConfig(allocator: std.mem.Allocator, data: []const u8, cfg: config.CompressionConfig) ![]u8 {
     var archive = Archive.init(allocator, cfg);
     defer archive.deinit();
     return archive.compress(data);
 }
 
-/// Decompress data with full configuration options.
 pub fn decompressWithConfig(allocator: std.mem.Allocator, data: []const u8, cfg: config.CompressionConfig) ![]u8 {
     var archive = Archive.init(allocator, cfg);
     defer archive.deinit();

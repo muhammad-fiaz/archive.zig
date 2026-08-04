@@ -1,5 +1,6 @@
 const std = @import("std");
 const archive = @import("archive");
+const build_options = @import("build_options");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -34,9 +35,9 @@ fn allAlgorithms(allocator: std.mem.Allocator) !void {
 
     const input = "The quick brown fox jumps over the lazy dog. " ** 100;
 
-    const algos = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .zstd, .lz4, .lzma, .xz, .tar_gz, .zip, .brotli };
+    const CoreAlgos = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .lz4, .lzma, .xz, .tar_gz, .zip };
 
-    for (algos) |algo| {
+    for (CoreAlgos) |algo| {
         const compressed = try archive.compress(allocator, input, algo);
         defer allocator.free(compressed);
 
@@ -47,6 +48,29 @@ fn allAlgorithms(allocator: std.mem.Allocator) !void {
         const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100;
         std.debug.print("   {s:8} {d:6} -> {d:6} bytes ({d:.1}%) verified: {s}\n", .{ @tagName(algo), input.len, compressed.len, ratio, if (ok) "OK" else "FAIL" });
     }
+
+    if (comptime build_options.zstd_enabled) {
+        const algo = archive.Algorithm.zstd;
+        const compressed = try archive.compress(allocator, input, algo);
+        defer allocator.free(compressed);
+        const decompressed = try archive.decompress(allocator, compressed, algo);
+        defer allocator.free(decompressed);
+        const ok = std.mem.eql(u8, input, decompressed);
+        const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100;
+        std.debug.print("   {s:8} {d:6} -> {d:6} bytes ({d:.1}%) verified: {s}\n", .{ @tagName(algo), input.len, compressed.len, ratio, if (ok) "OK" else "FAIL" });
+    }
+
+    if (comptime build_options.brotli_enabled) {
+        const algo = archive.Algorithm.brotli;
+        const compressed = try archive.compress(allocator, input, algo);
+        defer allocator.free(compressed);
+        const decompressed = try archive.decompress(allocator, compressed, algo);
+        defer allocator.free(decompressed);
+        const ok = std.mem.eql(u8, input, decompressed);
+        const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100;
+        std.debug.print("   {s:8} {d:6} -> {d:6} bytes ({d:.1}%) verified: {s}\n", .{ @tagName(algo), input.len, compressed.len, ratio, if (ok) "OK" else "FAIL" });
+    }
+
     std.debug.print("\n", .{});
 }
 
@@ -55,22 +79,30 @@ fn configPresets(allocator: std.mem.Allocator) !void {
 
     const input = "The quick brown fox jumps over the lazy dog. " ** 100;
 
-    const levels = [_]archive.Level{ .fastest, .fast, .default, .best, .ultra };
-    for (levels) |level| {
-        const cfg = archive.CompressionConfig.init(.zstd).withLevel(level);
+    if (comptime build_options.zstd_enabled) {
+        const levels = [_]archive.Level{ .fastest, .fast, .default, .best, .ultra };
+        for (levels) |level| {
+            const cfg = archive.CompressionConfig.init(.zstd).withLevel(level);
+            const compressed = try archive.compressWithConfig(allocator, input, cfg);
+            defer allocator.free(compressed);
+            const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100;
+            std.debug.print("   {s:8} {d:6} bytes ({d:.1}%)\n", .{ @tagName(level), compressed.len, ratio });
+        }
+
+        const custom = archive.CompressionConfig.init(.zstd)
+            .withZstdLevel(15)
+            .withChecksum()
+            .withWindowSize(1 << 22);
+        const custom_compressed = try archive.compressWithConfig(allocator, input, custom);
+        defer allocator.free(custom_compressed);
+        std.debug.print("   {s:8} {d:6} bytes (custom zstd:15)\n\n", .{ "custom", custom_compressed.len });
+    } else {
+        const cfg = archive.CompressionConfig.init(.gzip).withLevel(.default);
         const compressed = try archive.compressWithConfig(allocator, input, cfg);
         defer allocator.free(compressed);
         const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100;
-        std.debug.print("   {s:8} {d:6} bytes ({d:.1}%)\n", .{ @tagName(level), compressed.len, ratio });
+        std.debug.print("   {s:8} {d:6} bytes ({d:.1}%) (zstd not available)\n\n", .{ "default", compressed.len, ratio });
     }
-
-    const custom = archive.CompressionConfig.init(.zstd)
-        .withZstdLevel(15)
-        .withChecksum()
-        .withWindowSize(1 << 22);
-    const custom_compressed = try archive.compressWithConfig(allocator, input, custom);
-    defer allocator.free(custom_compressed);
-    std.debug.print("   {s:8} {d:6} bytes (custom zstd:15)\n\n", .{ "custom", custom_compressed.len });
 }
 
 fn streamingExample(allocator: std.mem.Allocator) !void {
@@ -78,14 +110,14 @@ fn streamingExample(allocator: std.mem.Allocator) !void {
 
     const input = "Streaming compression example data. " ** 50;
 
-    var compress_stream = try archive.stream.CompressStream.init(allocator, .zstd, .default);
+    var compress_stream = try archive.stream.CompressStream.init(allocator, .deflate, .default);
     defer compress_stream.deinit();
 
     try compress_stream.write(input);
     const compressed = try compress_stream.finish();
     defer allocator.free(compressed);
 
-    var decompress_stream = archive.stream.DecompressStream.init(allocator, .zstd);
+    var decompress_stream = archive.stream.DecompressStream.init(allocator, .deflate);
     defer decompress_stream.deinit();
 
     try decompress_stream.write(compressed);
@@ -93,5 +125,5 @@ fn streamingExample(allocator: std.mem.Allocator) !void {
     defer allocator.free(decompressed);
 
     const ok = std.mem.eql(u8, input, decompressed);
-    std.debug.print("   zstd streaming: {d} -> {d} -> {d} bytes, verified: {s}\n\n", .{ input.len, compressed.len, decompressed.len, if (ok) "OK" else "FAIL" });
+    std.debug.print("   deflate streaming: {d} -> {d} -> {d} bytes, verified: {s}\n\n", .{ input.len, compressed.len, decompressed.len, if (ok) "OK" else "FAIL" });
 }
