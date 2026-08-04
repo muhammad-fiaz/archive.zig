@@ -1,60 +1,58 @@
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");
-const constants = @import("../constants.zig");
-const utils = @import("../utils.zig");
-const deflate = @import("deflate.zig");
+const flate = std.compress.flate;
+
+fn levelToOptions(level: u8) flate.Compress.Options {
+    return switch (@min(level, 9)) {
+        1 => flate.Compress.Options.level_1,
+        2 => flate.Compress.Options.level_2,
+        3 => flate.Compress.Options.level_3,
+        4 => flate.Compress.Options.level_4,
+        5 => flate.Compress.Options.level_5,
+        6 => flate.Compress.Options.level_6,
+        7 => flate.Compress.Options.level_7,
+        8 => flate.Compress.Options.level_8,
+        9 => flate.Compress.Options.level_9,
+        else => flate.Compress.Options.level_6,
+    };
+}
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len + 50) catch return error.OutOfMemory;
-    errdefer result.deinit(allocator);
+    if (data.len == 0) return allocator.alloc(u8, 0);
 
-    try result.appendSlice(allocator, &constants.Magic.zlib);
+    var output = std.Io.Writer.Allocating.init(allocator);
+    defer output.deinit();
+    try output.ensureTotalCapacity(flate.max_window_len + 16);
 
-    const compressed_data = try deflate.compress(allocator, data, options);
-    defer allocator.free(compressed_data);
+    var buf: [flate.max_window_len]u8 = undefined;
+    var comp = flate.Compress.init(&output.writer, &buf, .zlib, levelToOptions(options.level orelse 6)) catch return errors.CompressError.InternalFailure;
 
-    try result.appendSlice(allocator, compressed_data);
+    comp.writer.writeAll(data) catch return errors.CompressError.WriteFailed;
+    comp.finish() catch return errors.CompressError.WriteFailed;
 
-    const adler32 = calculateAdler32(data);
-    try result.appendSlice(allocator, &std.mem.toBytes(std.mem.nativeToBig(u32, adler32)));
-
-    return result.toOwnedSlice(allocator);
+    return try output.toOwnedSlice();
 }
 
-pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    if (data.len < 6) return errors.CompressError.InvalidData;
+pub fn decompress(allocator: std.mem.Allocator, data: []const u8, _: config.Options) ![]u8 {
+    if (data.len == 0) return allocator.alloc(u8, 0);
 
-    if (!std.mem.eql(u8, data[0..2], &constants.Magic.zlib)) {
-        return errors.CompressError.InvalidMagic;
+    var output = std.Io.Writer.Allocating.init(allocator);
+    defer output.deinit();
+
+    var input = std.Io.Reader.fixed(data);
+    var buf: [flate.max_window_len]u8 = undefined;
+    var decomp = flate.Decompress.init(&input, .zlib, &buf);
+
+    while (true) {
+        _ = decomp.reader.stream(&output.writer, .unlimited) catch |err| switch (err) {
+            error.EndOfStream => break,
+            error.ReadFailed => return errors.CompressError.ReadFailed,
+            error.WriteFailed => return errors.CompressError.WriteFailed,
+        };
     }
 
-    const compressed_data = data[2 .. data.len - 4];
-    const stored_adler = std.mem.readInt(u32, data[data.len - 4 ..][0..4], .big);
-
-    const decompressed = try deflate.decompress(allocator, compressed_data, options);
-    errdefer allocator.free(decompressed);
-
-    const calculated_adler = calculateAdler32(decompressed);
-    if (calculated_adler != stored_adler) {
-        allocator.free(decompressed);
-        return errors.CompressError.ChecksumMismatch;
-    }
-
-    return decompressed;
-}
-
-fn calculateAdler32(data: []const u8) u32 {
-    const MOD_ADLER = 65521;
-    var a: u32 = 1;
-    var b: u32 = 0;
-
-    for (data) |byte| {
-        a = (a + byte) % MOD_ADLER;
-        b = (b + a) % MOD_ADLER;
-    }
-
-    return (b << 16) | a;
+    return try output.toOwnedSlice();
 }
 
 test "zlib compress and decompress" {
@@ -64,17 +62,21 @@ test "zlib compress and decompress" {
     const compressed = try compress(testing.allocator, data, .{});
     defer testing.allocator.free(compressed);
 
-    try testing.expect(std.mem.startsWith(u8, compressed, &constants.Magic.zlib));
-
     const decompressed = try decompress(testing.allocator, compressed, .{});
     defer testing.allocator.free(decompressed);
 
     try testing.expectEqualStrings(data, decompressed);
 }
 
-test "zlib adler32 checksum" {
-    const data = "Wikipedia";
-    const expected: u32 = 0x11E60398;
-    const result = calculateAdler32(data);
-    try std.testing.expectEqual(expected, result);
+test "zlib empty data" {
+    const testing = std.testing;
+
+    const data = "";
+    const compressed = try compress(testing.allocator, data, .{});
+    defer testing.allocator.free(compressed);
+
+    const decompressed = try decompress(testing.allocator, compressed, .{});
+    defer testing.allocator.free(decompressed);
+
+    try testing.expectEqualStrings(data, decompressed);
 }

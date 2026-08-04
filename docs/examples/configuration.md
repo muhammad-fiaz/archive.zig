@@ -55,15 +55,30 @@ pub fn zstdLevels(allocator: std.mem.Allocator) !void {
 
 ## File Filtering
 
-### Include/Exclude Patterns
+### Using PathFilter with FilterRule
 
 ```zig
 pub fn fileFiltering(allocator: std.mem.Allocator) !void {
-    // Configuration with file filtering
+    _ = allocator;
+
+    // Create a PathFilter with include and exclude rules
+    const filter = archive.PathFilter{
+        .include_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.zig", .is_directory = false },
+            .{ .pattern = "*.md", .is_directory = false },
+            .{ .pattern = "*.json", .is_directory = false },
+        },
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.tmp", .is_directory = false },
+            .{ .pattern = "*.log", .is_directory = false },
+            .{ .pattern = "*.cache", .is_directory = false },
+            .{ .pattern = "node_modules/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+        },
+    };
+
     const config = archive.CompressionConfig.init(.gzip)
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.cache" })
-        .includeFiles(&[_][]const u8{ "*.zig", "*.md", "*.json" })
-        .excludeDirectories(&[_][]const u8{ "node_modules/**", ".git/**" }, true);
+        .withPathFilter(filter);
     
     // Test path filtering
     const test_paths = [_]struct { path: []const u8, is_dir: bool }{
@@ -86,21 +101,23 @@ pub fn fileFiltering(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn advancedFiltering(allocator: std.mem.Allocator) !void {
-    // Create custom filter rules
-    const exclude_rules = [_]archive.FilterRule{
-        .{ .pattern = "*.tmp", .is_directory = false, .case_sensitive = false },
-        .{ .pattern = "build/**", .is_directory = true, .is_recursive = true },
-        .{ .pattern = "*.LOG", .is_directory = false, .case_sensitive = false },
-    };
-    
-    const include_rules = [_]archive.FilterRule{
-        .{ .pattern = "src/**", .is_directory = true, .is_recursive = true },
-        .{ .pattern = "*.zig", .is_directory = false, .case_sensitive = true },
+    _ = allocator;
+
+    // Create a PathFilter with detailed FilterRule options
+    const filter = archive.PathFilter{
+        .include_rules = &[_]archive.FilterRule{
+            .{ .pattern = "src/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "*.zig", .is_directory = false, .case_sensitive = true },
+        },
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.tmp", .is_directory = false, .case_sensitive = false },
+            .{ .pattern = "build/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "*.LOG", .is_directory = false, .case_sensitive = false },
+        },
     };
     
     const config = archive.CompressionConfig.init(.zstd)
-        .withExcludePatterns(&exclude_rules)
-        .withIncludePatterns(&include_rules);
+        .withPathFilter(filter);
     
     std.debug.print("Advanced filtering configuration created\n");
 }
@@ -224,10 +241,21 @@ pub fn compressionStrategies(allocator: std.mem.Allocator) !void {
 ```zig
 pub fn developmentConfig(allocator: std.mem.Allocator) !void {
     // Fast compression for development
+    const filter = archive.PathFilter{
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.tmp", .is_directory = false },
+            .{ .pattern = "*.log", .is_directory = false },
+            .{ .pattern = "*.obj", .is_directory = false },
+            .{ .pattern = "*.exe", .is_directory = false },
+            .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "zig-cache/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "zig-out/**", .is_directory = true, .is_recursive = true },
+        },
+    };
+
     const dev_config = archive.CompressionConfig.init(.lz4)
         .withLevel(.fastest)
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.obj", "*.exe" })
-        .excludeDirectories(&[_][]const u8{ ".git/**", "zig-cache/**", "zig-out/**" }, true)
+        .withPathFilter(filter)
         .withRecursive(true)
         .withMaxDepth(10);
     
@@ -244,11 +272,19 @@ pub fn developmentConfig(allocator: std.mem.Allocator) !void {
 ```zig
 pub fn productionConfig(allocator: std.mem.Allocator) !void {
     // High compression for production archives
+    const filter = archive.PathFilter{
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "node_modules/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "target/**", .is_directory = true, .is_recursive = true },
+        },
+    };
+
     const prod_config = archive.CompressionConfig.init(.zstd)
         .withZstdLevel(19)
         .withChecksum()
         .withKeepOriginal()
-        .excludeDirectories(&[_][]const u8{ ".git/**", "node_modules/**", "target/**" }, true)
+        .withPathFilter(filter)
         .withSizeRange(1, null)  // Exclude empty files
         .withRecursive(true);
     
@@ -265,11 +301,19 @@ pub fn productionConfig(allocator: std.mem.Allocator) !void {
 ```zig
 pub fn backupConfig(allocator: std.mem.Allocator) !void {
     // Balanced compression for backups
+    const filter = archive.PathFilter{
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.tmp", .is_directory = false },
+            .{ .pattern = "*.swp", .is_directory = false },
+            .{ .pattern = "*.bak", .is_directory = false },
+        },
+    };
+
     const backup_config = archive.CompressionConfig.init(.zstd)
         .withZstdLevel(10)
         .withChecksum()
         .withFollowSymlinks()
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.swp", "*.bak" })
+        .withPathFilter(filter)
         .withSizeRange(0, 100 * 1024 * 1024)  // Skip files > 100MB
         .withRecursive(true);
     

@@ -119,7 +119,7 @@ Please ensure your PR meets the following requirements:
 - [ ] Documentation builds without errors
 
 ### Compatibility
-- [ ] Changes are compatible with Zig 0.15.0+
+- [ ] Changes are compatible with Zig 0.16.0+
 - [ ] Cross-platform compatibility maintained
 - [ ] No new dependencies added without discussion
 - [ ] Backward compatibility maintained (or breaking changes documented)

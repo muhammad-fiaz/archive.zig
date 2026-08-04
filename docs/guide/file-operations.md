@@ -56,8 +56,8 @@ pub fn compressDirectory(allocator: std.mem.Allocator, dir_path: []const u8, out
     defer arena.deinit();
     const arena_allocator = arena.allocator();
     
-    var files = std.ArrayList([]const u8).init(arena_allocator);
-    var data = std.ArrayList(u8).init(arena_allocator);
+    var files = .empty;
+    var data = std.ArrayList(u8).empty;
     
     // Collect all files in directory
     try collectFiles(arena_allocator, dir_path, &files);
@@ -116,8 +116,6 @@ pub fn streamCompressFile(allocator: std.mem.Allocator, input_path: []const u8, 
     defer output_file.close();
     
     var buffer: [64 * 1024]u8 = undefined; // 64KB buffer
-    var compressed_data = std.ArrayList(u8).init(allocator);
-    defer compressed_data.deinit();
     
     while (true) {
         const bytes_read = try input_file.readAll(&buffer);
@@ -351,20 +349,27 @@ pub fn compressWithConfig(allocator: std.mem.Allocator, input_path: []const u8, 
 
 ```zig
 pub fn compressFilteredDirectory(allocator: std.mem.Allocator, dir_path: []const u8, output_path: []const u8) !void {
+    const exclude_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.tmp", .is_directory = false },
+        .{ .pattern = "*.log", .is_directory = false },
+        .{ .pattern = "*.cache", .is_directory = false },
+        .{ .pattern = ".git/**", .is_directory = true },
+        .{ .pattern = "node_modules/**", .is_directory = true },
+    };
+    
     const config = archive.CompressionConfig.init(.zstd)
         .withZstdLevel(15)
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.cache" })
-        .excludeDirectories(&[_][]const u8{ ".git/**", "node_modules/**" }, true)
+        .withPathFilter(.{ .exclude_rules = &exclude_rules })
         .withRecursive(true);
     
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const arena_allocator = arena.allocator();
     
-    var files = std.ArrayList([]const u8).init(arena_allocator);
+    var files = .empty;
     try collectFilteredFiles(arena_allocator, dir_path, &files, config);
     
-    var data = std.ArrayList(u8).init(arena_allocator);
+    var data = std.ArrayList(u8).empty;
     for (files.items) |file_path| {
         const file_data = try std.fs.cwd().readFileAlloc(arena_allocator, file_path, 10 * 1024 * 1024);
         
@@ -395,12 +400,12 @@ fn collectFilteredFiles(allocator: std.mem.Allocator, dir_path: []const u8, file
         
         switch (entry.kind) {
             .file => {
-                if (config.shouldIncludePath(full_path, false)) {
+                if (config.path_filter.shouldInclude(full_path, false)) {
                     try files.append(full_path);
                 }
             },
             .directory => {
-                if (config.shouldIncludePath(full_path, true) and config.recursive) {
+                if (config.path_filter.shouldInclude(full_path, true) and config.recursive) {
                     try collectFilteredFiles(allocator, full_path, files, config);
                 }
             },

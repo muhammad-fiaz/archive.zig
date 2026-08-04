@@ -37,6 +37,7 @@ Archive.zig recognizes these magic byte signatures:
 | **XZ** | `FD 37 7A 58 5A 00` | XZ file format |
 | **ZIP** | `50 4B 03 04` | ZIP local file header |
 | **TAR.GZ** | `1F 8B` + TAR | Gzip + TAR structure |
+| **Brotli** | `CE B2 CF 81` | Brotli magic number |
 
 ## Detection Examples
 
@@ -208,6 +209,7 @@ pub fn detectFromExtension(filename: []const u8) ?archive.Algorithm {
     if (std.mem.endsWith(u8, filename, ".zip")) return .zip;
     if (std.mem.endsWith(u8, filename, ".tar.gz")) return .tar_gz;
     if (std.mem.endsWith(u8, filename, ".tgz")) return .tar_gz;
+    if (std.mem.endsWith(u8, filename, ".br")) return .brotli;
     
     return null;
 }

@@ -24,7 +24,7 @@ export default defineConfig({
   description: SITE_DESCRIPTION,
   base: "/archive.zig/",
   lastUpdated: true,
-  cleanUrls: true,
+  cleanUrls: false,
   sitemap: {
     hostname: SITE_URL,
   },
@@ -161,7 +161,6 @@ gtag('config', '${GA_ID}');`,
       },
     ],
   ],
-  ignoreDeadLinks: [/.*\.zig$/],
   transformPageData(pageData) {
     // Dynamic OG image generation based on page title
     const pageTitle = pageData.title || SITE_NAME;

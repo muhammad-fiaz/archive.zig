@@ -10,10 +10,8 @@ The simplest way to compress data:
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     const input = "Hello, Archive.zig!";
     

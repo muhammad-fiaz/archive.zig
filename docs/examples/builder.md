@@ -147,11 +147,23 @@ pub fn lz4BuilderExample(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn fileFilteringBuilder(allocator: std.mem.Allocator) !void {
-    // Configuration with file filtering
+    // Configuration with file filtering using PathFilter
+    const include_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.zig" },
+        .{ .pattern = "*.md" },
+        .{ .pattern = "*.json" },
+    };
+    const exclude_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.tmp" },
+        .{ .pattern = "*.log" },
+        .{ .pattern = "*.cache" },
+    };
+    
     const config = archive.CompressionConfig.init(.gzip)
-        .includeFiles(&[_][]const u8{ "*.zig", "*.md", "*.json" })
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.cache" })
-        .withRecursive(true);
+        .withPathFilter(.{
+            .include_rules = &include_rules,
+            .exclude_rules = &exclude_rules,
+        });
     
     // Test paths
     const test_paths = [_]struct { path: []const u8, is_dir: bool }{
@@ -166,7 +178,7 @@ pub fn fileFilteringBuilder(allocator: std.mem.Allocator) !void {
     
     std.debug.print("File filtering results:\n");
     for (test_paths) |test_path| {
-        const included = config.shouldIncludePath(test_path.path, test_path.is_dir);
+        const included = config.path_filter.shouldInclude(test_path.path, test_path.is_dir);
         const status = if (included) "INCLUDED" else "EXCLUDED";
         std.debug.print("  {s}: {s}\n", .{ test_path.path, status });
     }
@@ -177,12 +189,23 @@ pub fn fileFilteringBuilder(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn directoryFilteringBuilder(allocator: std.mem.Allocator) !void {
-    // Configuration with directory filtering
+    // Configuration with directory filtering using PathFilter
+    const include_rules = [_]archive.FilterRule{
+        .{ .pattern = "src/**", .is_directory = true, .is_recursive = true },
+        .{ .pattern = "docs/**", .is_directory = true, .is_recursive = true },
+        .{ .pattern = "examples/**", .is_directory = true, .is_recursive = true },
+    };
+    const exclude_rules = [_]archive.FilterRule{
+        .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+        .{ .pattern = "node_modules/**", .is_directory = true, .is_recursive = true },
+        .{ .pattern = "zig-cache/**", .is_directory = true, .is_recursive = true },
+    };
+    
     const config = archive.CompressionConfig.init(.zstd)
-        .includeDirectories(&[_][]const u8{ "src/**", "docs/**", "examples/**" }, true)
-        .excludeDirectories(&[_][]const u8{ ".git/**", "node_modules/**", "zig-cache/**" }, true)
-        .withRecursive(true)
-        .withMaxDepth(5);
+        .withPathFilter(.{
+            .include_rules = &include_rules,
+            .exclude_rules = &exclude_rules,
+        });
     
     // Test directory paths
     const test_dirs = [_][]const u8{
@@ -198,7 +221,7 @@ pub fn directoryFilteringBuilder(allocator: std.mem.Allocator) !void {
     
     std.debug.print("Directory filtering results:\n");
     for (test_dirs) |dir_path| {
-        const included = config.shouldIncludePath(dir_path, true);
+        const included = config.path_filter.shouldInclude(dir_path, true);
         const status = if (included) "INCLUDED" else "EXCLUDED";
         std.debug.print("  {s}/: {s}\n", .{ dir_path, status });
     }
@@ -224,10 +247,10 @@ pub fn customFilterRulesBuilder(allocator: std.mem.Allocator) !void {
     
     // Build configuration with custom rules
     const config = archive.CompressionConfig.init(.lz4)
-        .withIncludePatterns(&include_rules)
-        .withExcludePatterns(&exclude_rules)
-        .withRecursive(true)
-        .withFollowSymlinks();
+        .withPathFilter(.{
+            .include_rules = &include_rules,
+            .exclude_rules = &exclude_rules,
+        });
     
     // Test various paths
     const test_paths = [_]struct { path: []const u8, is_dir: bool }{
@@ -243,7 +266,7 @@ pub fn customFilterRulesBuilder(allocator: std.mem.Allocator) !void {
     
     std.debug.print("Custom filter rules results:\n");
     for (test_paths) |test_path| {
-        const included = config.shouldIncludePath(test_path.path, test_path.is_dir);
+        const included = config.path_filter.shouldInclude(test_path.path, test_path.is_dir);
         const status = if (included) "INCLUDED" else "EXCLUDED";
         const type_str = if (test_path.is_dir) "DIR" else "FILE";
         std.debug.print("  {s} ({s}): {s}\n", .{ test_path.path, type_str, status });
@@ -378,9 +401,13 @@ pub fn environmentBasedBuilder(allocator: std.mem.Allocator, is_production: bool
     }
     
     // Add common settings
-    config = config
-        .withRecursive(true)
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log" });
+    const exclude_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.tmp" },
+        .{ .pattern = "*.log" },
+    };
+    config = config.withPathFilter(.{
+        .exclude_rules = &exclude_rules,
+    });
     
     return config;
 }

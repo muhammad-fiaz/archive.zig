@@ -100,7 +100,7 @@ body:
     attributes:
       label: Zig Version
       description: Output of `zig version`
-      placeholder: "0.15.0"
+      placeholder: "0.16.0"
     validations:
       required: false
 
@@ -109,7 +109,7 @@ body:
     attributes:
       label: Archive.zig Version
       description: Version of Archive.zig you're using
-      placeholder: "0.0.1"
+      placeholder: "0.0.2"
     validations:
       required: false
 

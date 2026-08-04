@@ -16,6 +16,7 @@ pub const algorithms = struct {
     pub const zip = @import("algorithms/zip.zig");
     pub const zlib = @import("algorithms/zlib.zig");
     pub const zstd = @import("algorithms/zstd.zig");
+    pub const brotli = @import("algorithms/brotli.zig");
 };
 
 pub const CompressionConfig = config.CompressionConfig;
@@ -25,12 +26,12 @@ pub const CompressError = errors.CompressError;
 
 pub const Archive = struct {
     allocator: std.mem.Allocator,
-    config: config.CompressionConfig,
+    cfg: config.CompressionConfig,
 
     pub fn init(allocator: std.mem.Allocator, cfg: config.CompressionConfig) Archive {
         return .{
             .allocator = allocator,
-            .config = cfg,
+            .cfg = cfg,
         };
     }
 
@@ -40,15 +41,15 @@ pub const Archive = struct {
 
     pub fn compress(self: *Archive, data: []const u8) ![]u8 {
         const options = config.Options{
-            .level = self.config.getEffectiveLevel(),
-            .checksum = self.config.checksum,
-            .zstd_level = if (self.config.algorithm == .zstd) self.config.getEffectiveZstdLevel() else null,
-            .dictionary = self.config.dictionary,
-            .window_size = self.config.window_size,
-            .memory_level = self.config.memory_level,
-            .strategy = self.config.strategy,
+            .level = self.cfg.getEffectiveLevel(),
+            .checksum = self.cfg.checksum,
+            .zstd_level = if (self.cfg.algorithm == .zstd) self.cfg.getEffectiveZstdLevel() else null,
+            .dictionary = self.cfg.dictionary,
+            .window_size = self.cfg.window_size,
+            .memory_level = self.cfg.memory_level,
+            .strategy = self.cfg.strategy,
         };
-        return switch (self.config.algorithm) {
+        return switch (self.cfg.algorithm) {
             .none => self.allocator.dupe(u8, data),
             .deflate => algorithms.deflate.compress(self.allocator, data, options),
             .gzip => algorithms.gzip.compress(self.allocator, data, options),
@@ -61,19 +62,20 @@ pub const Archive = struct {
             .zstd => algorithms.zstd.compress(self.allocator, data, options),
             .raw_deflate => algorithms.deflate.compress(self.allocator, data, options),
             .lzma2 => algorithms.lzma.compress(self.allocator, data, options),
+            .brotli => algorithms.brotli.compress(self.allocator, data, options),
         };
     }
 
     pub fn decompress(self: *Archive, data: []const u8) ![]u8 {
-        const detected = detectFormat(data);
+        const detected = if (self.cfg.algorithm != .none) self.cfg.algorithm else detectFormat(data);
         const options = config.Options{
-            .level = self.config.getEffectiveLevel(),
-            .checksum = self.config.checksum,
-            .zstd_level = if (detected == .zstd) self.config.getEffectiveZstdLevel() else null,
-            .dictionary = self.config.dictionary,
-            .window_size = self.config.window_size,
-            .memory_level = self.config.memory_level,
-            .strategy = self.config.strategy,
+            .level = self.cfg.getEffectiveLevel(),
+            .checksum = self.cfg.checksum,
+            .zstd_level = if (detected == .zstd) self.cfg.getEffectiveZstdLevel() else null,
+            .dictionary = self.cfg.dictionary,
+            .window_size = self.cfg.window_size,
+            .memory_level = self.cfg.memory_level,
+            .strategy = self.cfg.strategy,
         };
         return switch (detected) {
             .none => self.allocator.dupe(u8, data),
@@ -88,6 +90,7 @@ pub const Archive = struct {
             .zstd => algorithms.zstd.decompress(self.allocator, data, options),
             .raw_deflate => algorithms.deflate.decompress(self.allocator, data, options),
             .lzma2 => algorithms.lzma.decompress(self.allocator, data, options),
+            .brotli => algorithms.brotli.decompress(self.allocator, data, options),
         };
     }
 
@@ -102,7 +105,7 @@ pub const Archive = struct {
         defer self.allocator.free(compressed);
 
         const out_path = output_path orelse blk: {
-            break :blk try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ input_path, self.config.algorithm.extension() });
+            break :blk try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ input_path, self.cfg.algorithm.extension() });
         };
         defer if (output_path == null) self.allocator.free(out_path);
 
@@ -153,6 +156,11 @@ pub fn detectFormat(data: []const u8) Algorithm {
 
     const lz4_magic = [4]u8{ 0x04, 0x22, 0x4D, 0x18 };
     if (std.mem.startsWith(u8, data, &lz4_magic)) return .lz4;
+
+    if (data.len >= 13 and data[0] == 0x5D) {
+        const dict = std.mem.readInt(u32, data[1..5], .little);
+        if (dict != 0 and (dict & (dict - 1)) == 0) return .lzma;
+    }
 
     return .deflate;
 }

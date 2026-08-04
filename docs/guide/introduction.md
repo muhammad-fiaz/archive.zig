@@ -11,7 +11,7 @@ Archive.zig is a comprehensive, high-performance compression and archive library
 - Memory-efficient buffer management
 
 ### 🔧 Multiple Algorithms
-Archive.zig supports 9 different compression algorithms:
+Archive.zig supports 10 different compression algorithms:
 
 - **gzip** - GNU zip format with CRC32 checksums
 - **zlib** - Deflate compression with Adler32 checksums  
@@ -22,6 +22,7 @@ Archive.zig supports 9 different compression algorithms:
 - **xz** - LZMA2-based compression
 - **tar.gz** - TAR archives with gzip compression
 - **zip** - Standard ZIP archive format
+- **brotli** - Modern web compression with excellent ratio
 
 ### 🌊 Streaming Support
 - Process large files without loading everything into memory
@@ -69,7 +70,7 @@ Archive.zig is perfect for:
 - **Cross-Platform**: Works consistently across all Zig-supported platforms
 
 ### Compared to Other Zig Libraries
-- **Comprehensive**: Support for 9 different algorithms in one library
+- **Comprehensive**: Support for 10 different algorithms in one library
 - **Mature**: Battle-tested implementations with extensive testing
 - **Documented**: Complete documentation with examples
 - **Maintained**: Active development and community support

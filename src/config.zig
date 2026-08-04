@@ -1,5 +1,6 @@
 const std = @import("std");
 const Constants = @import("constants.zig");
+const utils = @import("utils.zig");
 
 pub const Algorithm = enum {
     none,
@@ -14,6 +15,7 @@ pub const Algorithm = enum {
     tar_gz,
     zip,
     lz4,
+    brotli,
 
     pub fn extension(self: Algorithm) []const u8 {
         return switch (self) {
@@ -29,6 +31,7 @@ pub const Algorithm = enum {
             .tar_gz => Constants.Extensions.tar_gz,
             .zip => Constants.Extensions.zip,
             .lz4 => Constants.Extensions.lz4,
+            .brotli => Constants.Extensions.brotli,
         };
     }
 
@@ -48,6 +51,7 @@ pub const Algorithm = enum {
             .tar_gz => 6,
             .zip => 6,
             .lz4 => 1,
+            .brotli => 6,
         };
     }
 
@@ -60,6 +64,7 @@ pub const Algorithm = enum {
             .tar_gz => 9,
             .zip => 9,
             .lz4 => 12,
+            .brotli => 11,
         };
     }
 
@@ -179,74 +184,7 @@ pub const PathFilter = struct {
     }
 
     fn matchesPattern(path: []const u8, pattern: []const u8, case_sensitive: bool) bool {
-        if (std.mem.eql(u8, pattern, "*")) return true;
-        if (std.mem.eql(u8, pattern, "**")) return true;
-
-        if (std.mem.startsWith(u8, pattern, "*.")) {
-            const ext = pattern[1..];
-            return if (case_sensitive)
-                std.mem.endsWith(u8, path, ext)
-            else
-                std.ascii.endsWithIgnoreCase(path, ext);
-        }
-
-        if (std.mem.startsWith(u8, pattern, "**/")) {
-            const suffix = pattern[3..];
-            return if (case_sensitive)
-                std.mem.indexOf(u8, path, suffix) != null
-            else
-                std.ascii.indexOfIgnoreCase(path, suffix) != null;
-        }
-
-        if (std.mem.endsWith(u8, pattern, "/**")) {
-            const prefix = pattern[0 .. pattern.len - 3];
-            return if (case_sensitive)
-                std.mem.startsWith(u8, path, prefix)
-            else
-                std.ascii.startsWithIgnoreCase(path, prefix);
-        }
-
-        if (std.mem.indexOf(u8, pattern, "*")) |_| {
-            return globMatch(path, pattern, case_sensitive);
-        }
-
-        return if (case_sensitive)
-            std.mem.eql(u8, path, pattern)
-        else
-            std.ascii.eqlIgnoreCase(path, pattern);
-    }
-
-    fn globMatch(text: []const u8, pattern: []const u8, case_sensitive: bool) bool {
-        var t_idx: usize = 0;
-        var p_idx: usize = 0;
-        var star_idx: ?usize = null;
-        var match_idx: usize = 0;
-
-        while (t_idx < text.len) {
-            if (p_idx < pattern.len and (pattern[p_idx] == '?' or
-                (case_sensitive and pattern[p_idx] == text[t_idx]) or
-                (!case_sensitive and std.ascii.toLower(pattern[p_idx]) == std.ascii.toLower(text[t_idx]))))
-            {
-                t_idx += 1;
-                p_idx += 1;
-            } else if (p_idx < pattern.len and pattern[p_idx] == '*') {
-                star_idx = p_idx;
-                match_idx = t_idx;
-                p_idx += 1;
-            } else if (star_idx) |s_idx| {
-                p_idx = s_idx + 1;
-                match_idx += 1;
-                t_idx = match_idx;
-            } else {
-                return false;
-            }
-        }
-
-        while (p_idx < pattern.len and pattern[p_idx] == '*') {
-            p_idx += 1;
-        }
-
-        return p_idx == pattern.len;
+        return utils.matchGlobWithCase(path, pattern, case_sensitive);
     }
 };
 
@@ -591,7 +529,8 @@ pub const CompressionConfig = struct {
 
     pub fn includeFiles(self: CompressionConfig, allocator: std.mem.Allocator, patterns: []const []const u8) !CompressionConfig {
         var cfg = self;
-        var rules = try std.ArrayList(FilterRule).initCapacity(allocator, patterns.len);
+        var rules: std.ArrayList(FilterRule) = .empty;
+        defer rules.deinit(allocator);
         for (patterns) |pattern| {
             try rules.append(allocator, .{ .pattern = pattern, .is_directory = false });
         }
@@ -603,7 +542,8 @@ pub const CompressionConfig = struct {
 
     pub fn includeDirectories(self: CompressionConfig, allocator: std.mem.Allocator, patterns: []const []const u8, recursive: bool) !CompressionConfig {
         var cfg = self;
-        var rules = try std.ArrayList(FilterRule).initCapacity(allocator, patterns.len);
+        var rules: std.ArrayList(FilterRule) = .empty;
+        defer rules.deinit(allocator);
         for (patterns) |pattern| {
             try rules.append(allocator, .{ .pattern = pattern, .is_directory = true, .is_recursive = recursive });
         }
@@ -615,7 +555,8 @@ pub const CompressionConfig = struct {
 
     pub fn excludeFiles(self: CompressionConfig, allocator: std.mem.Allocator, patterns: []const []const u8) !CompressionConfig {
         var cfg = self;
-        var rules = try std.ArrayList(FilterRule).initCapacity(allocator, patterns.len);
+        var rules: std.ArrayList(FilterRule) = .empty;
+        defer rules.deinit(allocator);
         for (patterns) |pattern| {
             try rules.append(allocator, .{ .pattern = pattern, .is_directory = false });
         }
@@ -627,7 +568,8 @@ pub const CompressionConfig = struct {
 
     pub fn excludeDirectories(self: CompressionConfig, allocator: std.mem.Allocator, patterns: []const []const u8, recursive: bool) !CompressionConfig {
         var cfg = self;
-        var rules = try std.ArrayList(FilterRule).initCapacity(allocator, patterns.len);
+        var rules: std.ArrayList(FilterRule) = .empty;
+        defer rules.deinit(allocator);
         for (patterns) |pattern| {
             try rules.append(allocator, .{ .pattern = pattern, .is_directory = true, .is_recursive = recursive });
         }

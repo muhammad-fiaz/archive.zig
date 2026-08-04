@@ -8,7 +8,7 @@ const LZ4_MAGIC = [4]u8{ 0x04, 0x22, 0x4D, 0x18 };
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
     _ = options;
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len + 50) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     try result.appendSlice(allocator, &LZ4_MAGIC);
@@ -19,7 +19,7 @@ pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.
     const block_size: u8 = 0x70;
     try result.append(allocator, block_size);
 
-    const header_checksum = calculateXXHash(&[_]u8{ flags, block_size }) & 0xFF;
+    const header_checksum = utils.lz4HeaderChecksum(&[_]u8{ flags, block_size }) & 0xFF;
     try result.append(allocator, @intCast(header_checksum));
 
     if (data.len == 0) {
@@ -48,7 +48,7 @@ pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: confi
     }
 
     var pos: usize = 7;
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len * 2) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     while (pos + 4 <= data.len) {
@@ -73,7 +73,7 @@ pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: confi
 fn compressBlock(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
     if (data.len == 0) return allocator.alloc(u8, 0);
 
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     const min_match = constants.Lz4Constants.min_match;
@@ -121,7 +121,7 @@ fn compressBlock(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
 }
 
 fn decompressBlock(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len * 2) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     var pos: usize = 0;
@@ -246,14 +246,6 @@ fn copyMatch(result: *std.ArrayList(u8), allocator: std.mem.Allocator, offset: u
         const idx = start + (i % offset);
         try result.append(allocator, result.items[idx]);
     }
-}
-
-fn calculateXXHash(data: []const u8) u32 {
-    var hash: u32 = 0;
-    for (data) |b| {
-        hash = (hash *% 31) +% b;
-    }
-    return hash;
 }
 
 test "lz4 compress and decompress" {

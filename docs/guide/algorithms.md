@@ -1,6 +1,6 @@
 # Algorithms
 
-Archive.zig supports 9 different compression algorithms, each optimized for different use cases. This guide helps you choose the right algorithm for your needs.
+Archive.zig supports 10 different compression algorithms, each optimized for different use cases. This guide helps you choose the right algorithm for your needs.
 
 ## Algorithm Overview
 
@@ -15,6 +15,7 @@ Archive.zig supports 9 different compression algorithms, each optimized for diff
 | **XZ** | Slow | Very High | Distribution packages |
 | **TAR.GZ** | Fast | Medium | Unix archives |
 | **ZIP** | Fast | Medium | Cross-platform archives |
+| **Brotli** | Fast | High | Web, general purpose |
 
 ## Detailed Algorithm Guide
 
@@ -166,6 +167,26 @@ const compressed = try archive.compress(allocator, data, .zip);
 - Built-in compression and metadata
 - Compatible with all operating systems
 
+### Brotli - Modern Web Compression
+
+**Best for**: Web content, HTTP compression, general purpose
+
+```zig
+const compressed = try archive.compress(allocator, data, .brotli);
+```
+
+**Characteristics**:
+- Developed by Google for web compression
+- Excellent compression ratio with good speed
+- Supports text-oriented and font-specific modes
+- Widely used in HTTP (Content-Encoding: br)
+
+**Configuration**:
+```zig
+const config = archive.CompressionConfig.init(.brotli)
+    .withLevel(.best);  // Level 0-11 (higher = better compression)
+```
+
 ## Choosing the Right Algorithm
 
 ### For Speed (Fastest to Slowest)
@@ -236,6 +257,7 @@ pub fn comparePerformance(allocator: std.mem.Allocator) !void {
         .{ .algo = .zstd, .name = "Zstd" },
         .{ .algo = .lzma, .name = "LZMA" },
         .{ .algo = .xz, .name = "XZ" },
+        .{ .algo = .brotli, .name = "Brotli" },
     };
     
     std.debug.print("Algorithm | Size | Ratio | Time (ms)\n");

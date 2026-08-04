@@ -276,7 +276,7 @@ pub fn wasmOptimizations(allocator: std.mem.Allocator) !void {
 
 // Export functions for JavaScript interop
 export fn compress_for_js(data_ptr: [*]const u8, data_len: usize, output_ptr: [*]u8, output_len: *usize) c_int {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     

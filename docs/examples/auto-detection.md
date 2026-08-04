@@ -14,7 +14,7 @@ pub fn basicDetectionExample(allocator: std.mem.Allocator) !void {
     // Create test data with different formats
     const test_data = "Auto-detection test data for various compression formats";
     
-    const algorithms = [_]archive.Algorithm{ .gzip, .zlib, .zstd, .lz4 };
+    const algorithms = [_]archive.Algorithm{ .gzip, .zlib, .zstd, .lz4, .brotli };
     
     for (algorithms) |algo| {
         // Compress with known algorithm
@@ -40,7 +40,7 @@ pub fn autoDecompressionExample(allocator: std.mem.Allocator) !void {
     const original_data = "This data will be compressed and then auto-decompressed";
     
     // Test with different algorithms
-    const algorithms = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib };
+    const algorithms = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .brotli };
     
     for (algorithms) |algo| {
         std.debug.print("Testing {s}:\n", .{@tagName(algo)});
@@ -214,7 +214,7 @@ pub fn magicByteAnalysis(data: []const u8) void {
 pub fn magicByteExample(allocator: std.mem.Allocator) !void {
     const test_data = "Magic byte analysis test data";
     
-    const algorithms = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .zip };
+    const algorithms = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .zip, .brotli };
     
     for (algorithms) |algo| {
         std.debug.print("\n--- {s} ---\n", .{@tagName(algo)});
@@ -433,7 +433,7 @@ pub fn robustAutoDetection(allocator: std.mem.Allocator, data: []const u8) ![]u8
                 std.debug.print("Warning: Data appears corrupted, trying alternative algorithms\n");
                 
                 // Try other algorithms as fallback
-                const fallback_algorithms = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .lz4 };
+                const fallback_algorithms = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .lz4, .brotli };
                 for (fallback_algorithms) |fallback| {
                     if (fallback == algorithm) continue;
                     
@@ -453,7 +453,7 @@ pub fn robustAutoDetection(allocator: std.mem.Allocator, data: []const u8) ![]u8
         std.debug.print("Could not auto-detect format, trying all algorithms\n");
         
         // Try all algorithms
-        const all_algorithms = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .zstd, .lz4, .lzma, .xz };
+        const all_algorithms = [_]archive.Algorithm{ .gzip, .zlib, .deflate, .zstd, .lz4, .lzma, .xz, .brotli };
         for (all_algorithms) |algo| {
             if (archive.decompress(allocator, data, algo)) |result| {
                 std.debug.print("Successfully decompressed with {s}\n", .{@tagName(algo)});

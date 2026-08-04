@@ -43,7 +43,7 @@ pub fn threadSafeExample() !void {
 }
 
 fn compressWorker(thread_id: usize, data: []const u8, result: *[]u8) void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
@@ -250,7 +250,7 @@ pub const CompressionThreadPool = struct {
     }
     
     fn workerThread(self: *CompressionThreadPool, worker_id: usize) void {
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        var gpa = std.heap.DebugAllocator(.{}){};
         defer _ = gpa.deinit();
         const allocator = gpa.allocator();
         
@@ -474,7 +474,7 @@ pub fn numaAwareCompression(allocator: std.mem.Allocator) !void {
 }
 
 fn numaWorker(data: []const u8, result: *[]u8) void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
@@ -522,7 +522,7 @@ pub fn lockFreeExample(allocator: std.mem.Allocator) !void {
 }
 
 fn lockFreeWorker(counter: *LockFreeCounter, thread_id: usize) void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
@@ -557,7 +557,7 @@ pub const ThreadSafeErrorReporter = struct {
     
     pub fn init(allocator: std.mem.Allocator) ThreadSafeErrorReporter {
         return ThreadSafeErrorReporter{
-            .errors = std.ArrayList(ThreadError).init(allocator),
+            .errors = .empty,
             .mutex = std.Thread.Mutex{},
             .allocator = allocator,
         };
@@ -567,7 +567,7 @@ pub const ThreadSafeErrorReporter = struct {
         for (self.errors.items) |err| {
             self.allocator.free(err.message);
         }
-        self.errors.deinit();
+        self.errors.deinit(self.allocator);
     }
     
     pub fn reportError(self: *ThreadSafeErrorReporter, thread_id: usize, err: anyerror, message: []const u8) !void {
@@ -622,7 +622,7 @@ pub fn threadSafeErrorHandling(allocator: std.mem.Allocator) !void {
 }
 
 fn errorProneWorker(error_reporter: *ThreadSafeErrorReporter, thread_id: usize) void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     

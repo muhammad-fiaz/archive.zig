@@ -35,10 +35,12 @@ pub fn writeSize(writer: anytype, bytes: u64) !void {
 }
 
 pub fn formatSize(allocator: std.mem.Allocator, bytes: u64) ![]u8 {
-    var list = std.ArrayList(u8){};
-    errdefer list.deinit(allocator);
-    try writeSize(list.writer(allocator), bytes);
-    return list.toOwnedSlice(allocator);
+    var list: std.ArrayList(u8) = .empty;
+    defer list.deinit(allocator);
+    var aw: std.Io.Writer.Allocating = .init(allocator);
+    defer aw.deinit();
+    try writeSize(&aw.writer, bytes);
+    return aw.toOwnedSlice();
 }
 
 pub fn parseDuration(s: []const u8) ?i64 {
@@ -248,17 +250,13 @@ pub fn isPathSafe(path: []const u8) bool {
 }
 
 pub fn normalizePathSeparators(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
-    var result = try allocator.alloc(u8, path.len);
-    for (path, 0..) |char, i| {
-        result[i] = if (char == '\\') '/' else char;
-    }
-    return result;
+    return try std.mem.replace(u8, allocator, path, "\\", "/");
 }
 
 pub fn getFileExtension(path: []const u8) []const u8 {
-    const basename = getBasename(path);
-    if (std.mem.lastIndexOf(u8, basename, ".")) |dot_idx| {
-        return basename[dot_idx..];
+    const base = std.fs.path.basename(path);
+    if (std.mem.lastIndexOf(u8, base, ".")) |dot_idx| {
+        return base[dot_idx..];
     }
     return "";
 }
@@ -284,17 +282,11 @@ pub fn calculateOptimalThreads(file_size: u64, available_cores: u32) u32 {
 }
 
 pub fn getBasename(path: []const u8) []const u8 {
-    if (std.mem.lastIndexOfAny(u8, path, "/\\")) |idx| {
-        return path[idx + 1 ..];
-    }
-    return path;
+    return std.fs.path.basename(path);
 }
 
 pub fn getDirname(path: []const u8) []const u8 {
-    if (std.mem.lastIndexOfAny(u8, path, "/\\")) |idx| {
-        return path[0..idx];
-    }
-    return "";
+    return std.fs.path.dirname(path) orelse "";
 }
 
 test "parseSize" {
@@ -366,7 +358,7 @@ pub fn copyMatchData(result: *std.ArrayList(u8), allocator: std.mem.Allocator, o
     }
 }
 
-pub fn calculateXXHash(data: []const u8) u32 {
+pub fn lz4HeaderChecksum(data: []const u8) u32 {
     var hash: u32 = 0;
     for (data) |b| {
         hash = (hash *% 31) +% b;
@@ -407,20 +399,21 @@ pub fn formatCompressionRatio(original_size: usize, compressed_size: usize) f64 
 
 test "copyMatchData" {
     const testing = std.testing;
-    var result = std.ArrayList(u8).initCapacity(testing.allocator, 10) catch return;
-    defer result.deinit(testing.allocator);
+    var result: std.ArrayList(u8) = .empty;
+    errdefer result.deinit(testing.allocator);
 
     try result.appendSlice(testing.allocator, "hello");
     try copyMatchData(&result, testing.allocator, 2, 2);
     try testing.expectEqualStrings("hellolo", result.items);
+    result.deinit(testing.allocator);
 }
 
-test "calculateXXHash" {
+test "lz4HeaderChecksum" {
     const testing = std.testing;
-    const hash1 = calculateXXHash("hello");
-    const hash2 = calculateXXHash("world");
+    const hash1 = lz4HeaderChecksum("hello");
+    const hash2 = lz4HeaderChecksum("world");
     try testing.expect(hash1 != hash2);
-    try testing.expect(hash1 == calculateXXHash("hello"));
+    try testing.expect(hash1 == lz4HeaderChecksum("hello"));
 }
 
 test "formatCompressionRatio" {

@@ -138,19 +138,19 @@ pub fn directoryCompressionExample(allocator: std.mem.Allocator) !void {
     }
     
     // Collect all files in directory
-    var file_list = std.ArrayList([]const u8).init(allocator);
+    var file_list = .empty;
     defer {
         for (file_list.items) |path| {
             allocator.free(path);
         }
-        file_list.deinit();
+        file_list.deinit(allocator);
     }
     
     try collectFilesRecursive(allocator, "test_dir", &file_list);
     
     // Create archive data
-    var archive_data = std.ArrayList(u8).init(allocator);
-    defer archive_data.deinit();
+    var archive_data = .empty;
+    defer archive_data.deinit(allocator);
     
     for (file_list.items) |file_path| {
         const file_data = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024);
@@ -437,28 +437,37 @@ pub fn filteredFileCompression(allocator: std.mem.Allocator) !void {
     }
     
     // Configuration to include only source and documentation files
+    const include_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.zig", .is_directory = false },
+        .{ .pattern = "*.md", .is_directory = false },
+    };
+    const exclude_rules = [_]archive.FilterRule{
+        .{ .pattern = "*.tmp", .is_directory = false },
+        .{ .pattern = "*.log", .is_directory = false },
+        .{ .pattern = "*.exe", .is_directory = false },
+    };
+    
     const config = archive.CompressionConfig.init(.zstd)
-        .includeFiles(&[_][]const u8{ "*.zig", "*.md" })
-        .excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.exe" })
+        .withPathFilter(.{ .include_rules = &include_rules, .exclude_rules = &exclude_rules })
         .withRecursive(true)
         .withZstdLevel(12);
     
     // Collect and filter files
-    var all_files = std.ArrayList([]const u8).init(allocator);
+    var all_files = .empty;
     defer {
         for (all_files.items) |path| {
             allocator.free(path);
         }
-        all_files.deinit();
+        all_files.deinit(allocator);
     }
     
     try collectFilesRecursive(allocator, "project", &all_files);
     
-    var filtered_files = std.ArrayList([]const u8).init(allocator);
-    defer filtered_files.deinit();
+    var filtered_files = .empty;
+    defer filtered_files.deinit(allocator);
     
     for (all_files.items) |file_path| {
-        if (config.shouldIncludePath(file_path, false)) {
+        if (config.path_filter.shouldInclude(file_path, false)) {
             try filtered_files.append(file_path);
         }
     }

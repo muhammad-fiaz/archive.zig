@@ -12,7 +12,7 @@ const archive = @import("archive");
 
 pub fn streamExample(allocator: std.mem.Allocator) !void {
     // Create a stream compressor
-    var compressor = try archive.StreamCompressor.init(allocator, .gzip);
+    var compressor = try archive.stream.CompressStream.init(allocator, .gzip, .default);
     defer compressor.deinit();
     
     // Process data in chunks
@@ -21,15 +21,14 @@ pub fn streamExample(allocator: std.mem.Allocator) !void {
     const chunk3 = "Final chunk of data";
     
     // Compress chunks
-    const compressed1 = try compressor.compress(chunk1);
-    const compressed2 = try compressor.compress(chunk2);
-    const compressed3 = try compressor.finish(chunk3); // Finish the stream
+    try compressor.write(chunk1);
+    try compressor.write(chunk2);
+    try compressor.write(chunk3);
+    const compressed = try compressor.finish();
     
-    defer allocator.free(compressed1);
-    defer allocator.free(compressed2);
-    defer allocator.free(compressed3);
+    defer allocator.free(compressed);
     
-    std.debug.print("Compressed chunks: {d}, {d}, {d} bytes\n", .{ compressed1.len, compressed2.len, compressed3.len });
+    std.debug.print("Compressed: {d} bytes\n", .{compressed.len});
 }
 ```
 
@@ -37,7 +36,7 @@ pub fn streamExample(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn streamDecompressExample(allocator: std.mem.Allocator, compressed_data: []const u8) !void {
-    var decompressor = try archive.StreamDecompressor.init(allocator, .gzip);
+    var decompressor = archive.stream.DecompressStream.init(allocator);
     defer decompressor.deinit();
     
     // Process compressed data in chunks
@@ -48,15 +47,13 @@ pub fn streamDecompressExample(allocator: std.mem.Allocator, compressed_data: []
         const end = @min(offset + chunk_size, compressed_data.len);
         const chunk = compressed_data[offset..end];
         
-        const decompressed_chunk = if (end == compressed_data.len)
-            try decompressor.finish(chunk) // Last chunk
-        else
-            try decompressor.decompress(chunk);
+        try decompressor.write(chunk);
         
-        defer allocator.free(decompressed_chunk);
-        
-        // Process decompressed chunk
-        std.debug.print("Decompressed chunk: {d} bytes\n", .{decompressed_chunk.len});
+        if (end == compressed_data.len) {
+            const decompressed = try decompressor.finish();
+            defer allocator.free(decompressed);
+            std.debug.print("Decompressed: {d} bytes\n", .{decompressed.len});
+        }
         
         offset = end;
     }
@@ -75,7 +72,7 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator, input_path: []const
     const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
     
-    var compressor = try archive.StreamCompressor.init(allocator, .zstd);
+    var compressor = try archive.stream.CompressStream.init(allocator, .zstd, .default);
     defer compressor.deinit();
     
     var buffer: [64 * 1024]u8 = undefined; // 64KB buffer
@@ -88,17 +85,15 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator, input_path: []const
         
         total_read += bytes_read;
         
-        const compressed_chunk = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read]) // Last chunk
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        defer allocator.free(compressed_chunk);
-        
-        try output_file.writeAll(compressed_chunk);
-        total_written += compressed_chunk.len;
-        
-        if (bytes_read < buffer.len) break; // EOF
+        if (bytes_read < buffer.len) {
+            const compressed = try compressor.finish();
+            defer allocator.free(compressed);
+            try output_file.writeAll(compressed);
+            total_written += compressed.len;
+            break;
+        }
     }
     
     const ratio = @as(f64, @floatFromInt(total_written)) / @as(f64, @floatFromInt(total_read)) * 100;
@@ -117,7 +112,7 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []con
     const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
     
-    var decompressor = try archive.StreamDecompressor.init(allocator, algorithm);
+    var decompressor = archive.stream.DecompressStream.init(allocator);
     defer decompressor.deinit();
     
     var buffer: [64 * 1024]u8 = undefined;
@@ -130,17 +125,15 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []con
         
         total_read += bytes_read;
         
-        const decompressed_chunk = if (bytes_read < buffer.len)
-            try decompressor.finish(buffer[0..bytes_read])
-        else
-            try decompressor.decompress(buffer[0..bytes_read]);
+        try decompressor.write(buffer[0..bytes_read]);
         
-        defer allocator.free(decompressed_chunk);
-        
-        try output_file.writeAll(decompressed_chunk);
-        total_written += decompressed_chunk.len;
-        
-        if (bytes_read < buffer.len) break;
+        if (bytes_read < buffer.len) {
+            const decompressed = try decompressor.finish();
+            defer allocator.free(decompressed);
+            try output_file.writeAll(decompressed);
+            total_written += decompressed.len;
+            break;
+        }
     }
     
     std.debug.print("Stream decompressed {s} -> {s}: {d} -> {d} bytes\n", 
@@ -154,7 +147,7 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []con
 
 ```zig
 pub fn compressHttpResponse(allocator: std.mem.Allocator, response_data: []const u8, writer: anytype) !void {
-    var compressor = try archive.StreamCompressor.init(allocator, .gzip);
+    var compressor = try archive.stream.CompressStream.init(allocator, .gzip, .default);
     defer compressor.deinit();
     
     // Compress in chunks for streaming
@@ -165,15 +158,13 @@ pub fn compressHttpResponse(allocator: std.mem.Allocator, response_data: []const
         const end = @min(offset + chunk_size, response_data.len);
         const chunk = response_data[offset..end];
         
-        const compressed_chunk = if (end == response_data.len)
-            try compressor.finish(chunk)
-        else
-            try compressor.compress(chunk);
+        try compressor.write(chunk);
         
-        defer allocator.free(compressed_chunk);
-        
-        // Write compressed chunk to network
-        try writer.writeAll(compressed_chunk);
+        if (end == response_data.len) {
+            const compressed = try compressor.finish();
+            defer allocator.free(compressed);
+            try writer.writeAll(compressed);
+        }
         
         offset = end;
     }
@@ -184,7 +175,7 @@ pub fn compressHttpResponse(allocator: std.mem.Allocator, response_data: []const
 
 ```zig
 pub fn realTimeCompress(allocator: std.mem.Allocator) !void {
-    var compressor = try archive.StreamCompressor.init(allocator, .lz4);
+    var compressor = try archive.stream.CompressStream.init(allocator, .lz4, .default);
     defer compressor.deinit();
     
     // Simulate real-time data stream
@@ -193,11 +184,7 @@ pub fn realTimeCompress(allocator: std.mem.Allocator) !void {
         const data = try std.fmt.allocPrint(allocator, "Real-time data packet {d}\n", .{i});
         defer allocator.free(data);
         
-        const compressed = try compressor.compress(data);
-        defer allocator.free(compressed);
-        
-        // Send compressed data immediately
-        std.debug.print("Packet {d}: {d} -> {d} bytes\n", .{ i, data.len, compressed.len });
+        try compressor.write(data);
         
         // Simulate delay
         std.time.sleep(10 * std.time.ns_per_ms);
@@ -205,7 +192,7 @@ pub fn realTimeCompress(allocator: std.mem.Allocator) !void {
     }
     
     // Finish the stream
-    const final_chunk = try compressor.finish("");
+    const final_chunk = try compressor.finish();
     defer allocator.free(final_chunk);
     
     if (final_chunk.len > 0) {
@@ -220,15 +207,15 @@ pub fn realTimeCompress(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub const BufferedCompressor = struct {
-    compressor: archive.StreamCompressor,
+    compressor: archive.stream.CompressStream,
     buffer: std.ArrayList(u8),
     buffer_size: usize,
     allocator: std.mem.Allocator,
     
     pub fn init(allocator: std.mem.Allocator, algorithm: archive.Algorithm, buffer_size: usize) !BufferedCompressor {
         return BufferedCompressor{
-            .compressor = try archive.StreamCompressor.init(allocator, algorithm),
-            .buffer = std.ArrayList(u8).init(allocator),
+            .compressor = try archive.stream.CompressStream.init(allocator, algorithm, .default),
+            .buffer = .empty,
             .buffer_size = buffer_size,
             .allocator = allocator,
         };
@@ -236,7 +223,7 @@ pub const BufferedCompressor = struct {
     
     pub fn deinit(self: *BufferedCompressor) void {
         self.compressor.deinit();
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
     
     pub fn write(self: *BufferedCompressor, data: []const u8) !?[]u8 {
@@ -252,13 +239,14 @@ pub const BufferedCompressor = struct {
     pub fn flush(self: *BufferedCompressor) ![]u8 {
         if (self.buffer.items.len == 0) return try self.allocator.alloc(u8, 0);
         
-        const compressed = try self.compressor.compress(self.buffer.items);
+        try self.compressor.write(self.buffer.items);
+        const compressed = try self.compressor.finish();
         self.buffer.clearRetainingCapacity();
         return compressed;
     }
     
     pub fn finish(self: *BufferedCompressor) ![]u8 {
-        const compressed = try self.compressor.finish(self.buffer.items);
+        const compressed = try self.compressor.finish();
         self.buffer.clearRetainingCapacity();
         return compressed;
     }
@@ -349,12 +337,7 @@ fn compressChunk(allocator: std.mem.Allocator, chunk: []const u8, result: *[]u8)
 
 ```zig
 pub fn configurableStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const config = archive.CompressionConfig.init(.zstd)
-        .withZstdLevel(15)
-        .withBufferSize(128 * 1024)
-        .withChecksum();
-    
-    var compressor = try archive.StreamCompressor.initWithConfig(allocator, config);
+    var compressor = try archive.stream.CompressStream.init(allocator, .zstd, .default);
     defer compressor.deinit();
     
     const input_file = try std.fs.cwd().openFile(input_path, .{});
@@ -363,21 +346,20 @@ pub fn configurableStreamCompress(allocator: std.mem.Allocator, input_path: []co
     const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
     
-    var buffer: [config.buffer_size]u8 = undefined;
+    var buffer: [64 * 1024]u8 = undefined;
     
     while (true) {
         const bytes_read = try input_file.readAll(&buffer);
         if (bytes_read == 0) break;
         
-        const compressed = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read])
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        defer allocator.free(compressed);
-        try output_file.writeAll(compressed);
-        
-        if (bytes_read < buffer.len) break;
+        if (bytes_read < buffer.len) {
+            const compressed = try compressor.finish();
+            defer allocator.free(compressed);
+            try output_file.writeAll(compressed);
+            break;
+        }
     }
 }
 ```
@@ -399,7 +381,7 @@ pub fn memoryEfficientStream(allocator: std.mem.Allocator, input_path: []const u
     const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
     
-    var compressor = try archive.StreamCompressor.init(arena_allocator, .lz4);
+    var compressor = try archive.stream.CompressStream.init(arena_allocator, .lz4, .default);
     defer compressor.deinit();
     
     const buffer_size = 32 * 1024; // Small buffer for memory efficiency
@@ -409,17 +391,13 @@ pub fn memoryEfficientStream(allocator: std.mem.Allocator, input_path: []const u
         const bytes_read = try input_file.readAll(&buffer);
         if (bytes_read == 0) break;
         
-        const compressed = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read])
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        try output_file.writeAll(compressed);
-        
-        // Free compressed data immediately (arena will clean up)
-        // No need for explicit free with arena allocator
-        
-        if (bytes_read < buffer.len) break;
+        if (bytes_read < buffer.len) {
+            const compressed = try compressor.finish();
+            try output_file.writeAll(compressed);
+            break;
+        }
     }
     
     std.debug.print("Memory-efficient streaming completed\n", .{});
@@ -450,7 +428,7 @@ pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8
     };
     defer output_file.close();
     
-    var compressor = archive.StreamCompressor.init(allocator, .gzip) catch |err| switch (err) {
+    var compressor = archive.stream.CompressStream.init(allocator, .gzip, .default) catch |err| switch (err) {
         error.OutOfMemory => {
             std.debug.print("Error: Not enough memory for compressor\n", .{});
             return err;
@@ -470,23 +448,26 @@ pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8
         
         if (bytes_read == 0) break;
         
-        const compressed = (if (bytes_read < buffer.len)
-            compressor.finish(buffer[0..bytes_read])
-        else
-            compressor.compress(buffer[0..bytes_read])) catch |err| {
+        compressor.write(buffer[0..bytes_read]) catch |err| {
             std.debug.print("Error compressing data at offset {d}: {}\n", .{ total_processed, err });
             return err;
         };
-        defer allocator.free(compressed);
         
-        output_file.writeAll(compressed) catch |err| {
-            std.debug.print("Error writing compressed data: {}\n", .{err});
-            return err;
-        };
+        if (bytes_read < buffer.len) {
+            const compressed = compressor.finish() catch |err| {
+                std.debug.print("Error finishing compression: {}\n", .{err});
+                return err;
+            };
+            defer allocator.free(compressed);
+            
+            output_file.writeAll(compressed) catch |err| {
+                std.debug.print("Error writing compressed data: {}\n", .{err});
+                return err;
+            };
+            break;
+        }
         
         total_processed += bytes_read;
-        
-        if (bytes_read < buffer.len) break;
     }
     
     std.debug.print("Successfully processed {d} bytes\n", .{total_processed});
@@ -502,12 +483,7 @@ pub fn optimizedStreamCompress(allocator: std.mem.Allocator, input_path: []const
     // Use larger buffers for better performance
     const buffer_size = 1024 * 1024; // 1MB buffer
     
-    // Use fast algorithm for streaming
-    const config = archive.CompressionConfig.init(.lz4)
-        .withLevel(.fastest)
-        .withBufferSize(buffer_size);
-    
-    var compressor = try archive.StreamCompressor.initWithConfig(allocator, config);
+    var compressor = try archive.stream.CompressStream.init(allocator, .lz4, .default);
     defer compressor.deinit();
     
     const input_file = try std.fs.cwd().openFile(input_path, .{});
@@ -529,15 +505,14 @@ pub fn optimizedStreamCompress(allocator: std.mem.Allocator, input_path: []const
         
         total_bytes += bytes_read;
         
-        const compressed = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read])
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        defer allocator.free(compressed);
-        try output_file.writeAll(compressed);
-        
-        if (bytes_read < buffer.len) break;
+        if (bytes_read < buffer.len) {
+            const compressed = try compressor.finish();
+            defer allocator.free(compressed);
+            try output_file.writeAll(compressed);
+            break;
+        }
     }
     
     const end_time = std.time.nanoTimestamp();

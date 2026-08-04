@@ -38,20 +38,22 @@ config.withZstdLevel(19)
 ### File Filtering
 
 ```zig
-// Include/exclude files by pattern
-config.excludeFiles(&[_][]const u8{ "*.tmp", "*.log", "*.cache" })
-config.includeFiles(&[_][]const u8{ "*.zig", "*.md", "*.json" })
-
-// Include/exclude directories
-config.includeDirectories(&[_][]const u8{ "src/**", "docs/**" }, true)
-config.excludeDirectories(&[_][]const u8{ "node_modules/**", ".git/**" }, true)
-
-// Advanced filtering with FilterRule
-const rules = [_]archive.FilterRule{
-    .{ .pattern = "*.tmp", .is_directory = false, .case_sensitive = false },
-    .{ .pattern = "build/**", .is_directory = true, .is_recursive = true },
+// Build a PathFilter with FilterRule structs
+const filter = archive.PathFilter{
+    .include_rules = &[_]archive.FilterRule{
+        .{ .pattern = "*.zig", .is_directory = false },
+        .{ .pattern = "*.md", .is_directory = false },
+        .{ .pattern = "src/**", .is_directory = true, .is_recursive = true },
+    },
+    .exclude_rules = &[_]archive.FilterRule{
+        .{ .pattern = "*.tmp", .is_directory = false, .case_sensitive = false },
+        .{ .pattern = "*.log", .is_directory = false },
+        .{ .pattern = "*.cache", .is_directory = false },
+        .{ .pattern = "node_modules/**", .is_directory = true, .is_recursive = true },
+        .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+    },
 };
-config.withExcludePatterns(&rules)
+config = config.withPathFilter(filter);
 ```
 
 ### Directory Traversal
@@ -134,7 +136,12 @@ var lz4_config = archive.CompressionConfig.init(.lz4)
 ```zig
 var dev_config = archive.CompressionConfig.init(.lz4)
     .withLevel(.fastest)
-    .excludeFiles(&[_][]const u8{ "*.tmp", "*.log" })
+    .withPathFilter(.{
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = "*.tmp", .is_directory = false },
+            .{ .pattern = "*.log", .is_directory = false },
+        },
+    })
     .withRecursive(true);
 ```
 
@@ -145,7 +152,12 @@ var prod_config = archive.CompressionConfig.init(.zstd)
     .withZstdLevel(10)
     .withChecksum()
     .withKeepOriginal()
-    .excludeDirectories(&[_][]const u8{ ".git/**", "node_modules/**" }, true);
+    .withPathFilter(.{
+        .exclude_rules = &[_]archive.FilterRule{
+            .{ .pattern = ".git/**", .is_directory = true, .is_recursive = true },
+            .{ .pattern = "node_modules/**", .is_directory = true, .is_recursive = true },
+        },
+    });
 ```
 
 ### Archive Configuration
@@ -154,8 +166,7 @@ var prod_config = archive.CompressionConfig.init(.zstd)
 var archive_config = archive.CompressionConfig.init(.xz)
     .withLevel(.best)
     .withChecksum()
-    .withSizeRange(0, null)  // No size limits
-    .withMaxDepth(null);     // No depth limits
+    .withSizeRange(0, null);  // No max size limit
 ```
 
 ## Pattern Matching
