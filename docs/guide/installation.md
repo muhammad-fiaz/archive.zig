@@ -109,7 +109,7 @@ pub fn main(init: std.process.Init) !void {
 
 Run with:
 ```bash
-zig build run
+zig build run-all-examples
 ```
 
 ## Build Options

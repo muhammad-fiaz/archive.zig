@@ -27,11 +27,8 @@ features:
     title: Streaming Support
     details: Memory-efficient streaming compression and decompression for large files and real-time data.
   - icon: 🎯
-    title: Simple API
-    details: Clean, intuitive API with builder pattern support and automatic algorithm detection.
-  - icon: 🔍
-    title: Auto-Detection
-    details: Automatically detect compression algorithms from file headers and magic bytes.
+    title: Explicit API
+    details: Clean, intuitive API with builder pattern support - always specify your algorithm explicitly.
   - icon: 🛠️
     title: Configuration
     details: Flexible configuration with presets for different use cases - fast, balanced, best compression.

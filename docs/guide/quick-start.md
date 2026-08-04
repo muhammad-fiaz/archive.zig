@@ -44,16 +44,16 @@ for (algorithms) |algo| {
 }
 ```
 
-## Auto-Detection
+## Explicit Algorithm Selection
 
-Let Archive.zig automatically detect the compression format:
+Always specify your algorithm explicitly:
 
 ```zig
-// Compress with any algorithm
+// Compress with explicit algorithm
 const compressed = try archive.compress(allocator, input, .zstd);
 defer allocator.free(compressed);
 
-// Decompress
+// Decompress with same algorithm
 const decompressed = try archive.decompress(allocator, compressed, .zstd);
 defer allocator.free(decompressed);
 ```
