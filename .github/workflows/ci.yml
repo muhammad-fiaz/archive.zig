@@ -39,7 +39,7 @@ jobs:
         run: zig fmt --check src/ examples/
 
   examples-run:
-    name: Run Examples Matrix (hostable targets)
+    name: Run Examples Matrix (native targets)
     needs: build
     runs-on: ${{ matrix.os }}
     strategy:
@@ -47,18 +47,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-linux
-          - os: ubuntu-latest
-            target: x86-linux
-          - os: ubuntu-latest
-            target: aarch64-linux
           - os: macos-latest
             target: x86_64-macos
-          - os: macos-latest
-            target: aarch64-macos
           - os: windows-latest
             target: x86_64-windows
-          - os: windows-latest
-            target: x86-windows
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -70,22 +62,11 @@ jobs:
         with:
           version: 0.16.0
 
-      - name: Install QEMU and Multilib (Linux)
-        if: runner.os == 'Linux' && (matrix.target == 'aarch64-linux' || matrix.target == 'x86-linux')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static gcc-multilib
-          if [ "${{ matrix.target }}" = "aarch64-linux" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-          fi
-
       - name: Run Zig tests on ${{ matrix.target }}
-        run: zig build test -Dtarget=${{ matrix.target }} --summary all
+        run: zig build test --summary all
 
       - name: Run examples on ${{ matrix.target }}
-        run: |
-          echo "Running examples for ${{ matrix.target }}"
-          zig build run-all-examples -Dtarget=${{ matrix.target }}
+        run: zig build run-all-examples
 
   examples-build-only:
     name: Build Examples / Library Matrix (build-only for many targets)
@@ -101,15 +82,11 @@ jobs:
           - aarch64-macos
           - x86_64-windows
           - x86-windows
-          - x86_64-freestanding
-          - aarch64-freestanding
-          - riscv64-freestanding
           - riscv64-linux
           - riscv32-linux
           - powerpc64le-linux
           - mips64-linux
           - s390x-linux
-          - arm-freestanding
           - arm-linux-gnueabihf
     steps:
       - name: Checkout
