@@ -36,8 +36,38 @@ Archive.zig recognizes these magic byte signatures:
 | **LZMA** | `5D 00 00` | LZMA header |
 | **XZ** | `FD 37 7A 58 5A 00` | XZ file format |
 | **ZIP** | `50 4B 03 04` | ZIP local file header |
-| **TAR.GZ** | `1F 8B` + TAR | Gzip + TAR structure |
-| **Brotli** | `CE B2 CF 81` | Brotli magic number |
+
+Formats without magic numbers (Brotli, Deflate) require extension-based or explicit algorithm selection.
+
+## File Extension Detection
+
+Use `detectFromPath` for extension-based detection, which covers all algorithms:
+
+| Extension | Algorithm |
+|-----------|-----------|
+| `.gz` | gzip |
+| `.zlib` | zlib |
+| `.deflate` | deflate |
+| `.zst` | zstd |
+| `.lz4` | lz4 |
+| `.lzma` | lzma |
+| `.xz` | xz |
+| `.br` | brotli |
+| `.zip` | zip |
+| `.tar.gz` | tar_gz |
+
+```zig
+// Detect from file path
+if (archive.detectFromPath("data.br")) |algo| {
+    std.debug.print("Detected: {s}\n", .{@tagName(algo)}); // "brotli"
+}
+
+// Decompress with path-based detection
+const data = try std.Io.Dir.cwd().readFileAlloc(io, "archive.br", allocator, .limited(10 * 1024 * 1024));
+defer allocator.free(data);
+const decompressed = try archive.autoDecompressFromPath(allocator, data, "archive.br");
+defer allocator.free(decompressed);
+```
 
 ## Detection Examples
 

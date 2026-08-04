@@ -135,6 +135,47 @@ const decompressed = try archive.autoDecompress(allocator, compressed_data);
 defer allocator.free(decompressed);
 ```
 
+### `detectFromPath`
+
+```zig
+pub fn detectFromPath(path: []const u8) ?Algorithm
+```
+
+Detects algorithm from file extension (e.g., ".gz", ".zst", ".br"). Returns `null` if unrecognized.
+
+**Parameters:**
+- `path`: File path to inspect
+
+**Returns:** Detected algorithm or `null`
+
+**Example:**
+```zig
+if (archive.detectFromPath("data.br")) |algo| {
+    std.debug.print("Detected: {s}\n", .{@tagName(algo)}); // "brotli"
+}
+```
+
+### `autoDecompressFromPath`
+
+```zig
+pub fn autoDecompressFromPath(allocator: std.mem.Allocator, data: []const u8, path: []const u8) ![]u8
+```
+
+Detects algorithm from file extension, falls back to magic bytes if extension is unrecognized.
+
+**Parameters:**
+- `allocator`: Memory allocator
+- `data`: Compressed data
+- `path`: File path (used for extension-based detection)
+
+**Returns:** Decompressed data (caller owns memory)
+
+**Example:**
+```zig
+const decompressed = try archive.autoDecompressFromPath(allocator, data, "archive.br");
+defer allocator.free(decompressed);
+```
+
 ## Archive Struct
 
 ```zig

@@ -95,6 +95,25 @@ pub const Archive = struct {
     }
 };
 
+/// Detect algorithm from file extension (e.g., ".gz", ".zst", ".br").
+/// Returns null if extension is unrecognized.
+pub fn detectFromPath(path: []const u8) ?Algorithm {
+    if (std.mem.endsWith(u8, path, ".tar.gz")) return .tar_gz;
+
+    const ext = std.fs.path.extension(path);
+    if (std.mem.eql(u8, ext, ".gz")) return .gzip;
+    if (std.mem.eql(u8, ext, ".zlib")) return .zlib;
+    if (std.mem.eql(u8, ext, ".deflate")) return .deflate;
+    if (std.mem.eql(u8, ext, ".zst")) return .zstd;
+    if (std.mem.eql(u8, ext, ".lz4")) return .lz4;
+    if (std.mem.eql(u8, ext, ".lzma")) return .lzma;
+    if (std.mem.eql(u8, ext, ".xz")) return .xz;
+    if (std.mem.eql(u8, ext, ".br")) return .brotli;
+    if (std.mem.eql(u8, ext, ".zip")) return .zip;
+
+    return null;
+}
+
 pub fn detectFormat(data: []const u8) Algorithm {
     if (data.len < 4) return .none;
 
@@ -114,7 +133,7 @@ pub fn detectFormat(data: []const u8) Algorithm {
         if (dict != 0 and (dict & (dict - 1)) == 0) return .lzma;
     }
 
-    return .deflate;
+    return .none;
 }
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, algorithm: Algorithm) ![]u8 {
@@ -143,6 +162,11 @@ pub fn detectAlgorithm(data: []const u8) ?Algorithm {
 pub fn autoDecompress(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
     const detected = detectFormat(data);
     return decompress(allocator, data, detected);
+}
+
+pub fn autoDecompressFromPath(allocator: std.mem.Allocator, data: []const u8, path: []const u8) ![]u8 {
+    const algo = detectFromPath(path) orelse detectFormat(data);
+    return decompress(allocator, data, algo);
 }
 
 pub const Compressor = struct {

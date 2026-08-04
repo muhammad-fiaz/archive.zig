@@ -78,14 +78,29 @@ fn autoDetection(allocator: std.mem.Allocator) !void {
 
     const input = "Auto-detection test data for all algorithms.";
 
-    const algos = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .lzma, .xz, .brotli };
-    for (algos) |algo| {
+    // Magic bytes detection (in-memory data)
+    std.debug.print("   Magic bytes detection:\n", .{});
+    const magic_algos = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .lzma, .xz };
+    for (magic_algos) |algo| {
         const compressed = try archive.compress(allocator, input, algo);
         defer allocator.free(compressed);
 
-        const detected = archive.detectAlgorithm(compressed);
+        const detected = archive.detectFormat(compressed);
+        const ok = detected == algo;
+        std.debug.print("     {s:8} -> {s:8} {s}\n", .{ @tagName(algo), @tagName(detected), if (ok) "OK" else "FAIL" });
+    }
+
+    // File extension detection (all algorithms)
+    std.debug.print("   File extension detection:\n", .{});
+    const ext_algos = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .lzma, .xz, .brotli, .zip, .tar_gz, .deflate };
+    for (ext_algos) |algo| {
+        const ext = algo.extension();
+        const path = try std.fmt.allocPrint(allocator, "test{s}", .{ext});
+        defer allocator.free(path);
+
+        const detected = archive.detectFromPath(path);
         const ok = detected != null and detected.? == algo;
-        std.debug.print("   {s:8} -> {s:8} {s}\n", .{ @tagName(algo), if (detected) |d| @tagName(d) else "none", if (ok) "OK" else "FAIL" });
+        std.debug.print("     {s:8} {s:6} -> {s:8} {s}\n", .{ @tagName(algo), ext, if (detected) |d| @tagName(d) else "none", if (ok) "OK" else "FAIL" });
     }
     std.debug.print("\n", .{});
 }
