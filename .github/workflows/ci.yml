@@ -21,7 +21,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Run Zig tests
         run: zig build test --summary all
@@ -68,7 +68,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Install QEMU and Multilib (Linux)
         if: runner.os == 'Linux' && (matrix.target == 'aarch64-linux' || matrix.target == 'x86-linux')
@@ -85,7 +85,7 @@ jobs:
       - name: Run examples on ${{ matrix.target }}
         run: |
           echo "Running examples for ${{ matrix.target }}"
-          zig build run -Dtarget=${{ matrix.target }}
+          zig build run-all-examples -Dtarget=${{ matrix.target }}
 
   examples-build-only:
     name: Build Examples / Library Matrix (build-only for many targets)
@@ -120,7 +120,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: Build for ${{ matrix.target }} (build-only)
         run: zig build -Dtarget=${{ matrix.target }} -Doptimize=Debug
