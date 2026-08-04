@@ -23,6 +23,9 @@ zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/
 zig fetch --save git+https://github.com/muhammad-fiaz/archive.zig.git
 ```
 
+> [!NOTE]
+> This pulls the latest code directly from the `main` branch. Use this for early access to new features and bug fixes before an official release. The API may change between commits.
+
 This automatically adds the dependency to your `build.zig.zon` file with the correct hash.
 
 ## Manual Configuration

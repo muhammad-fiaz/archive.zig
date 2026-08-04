@@ -12,7 +12,6 @@
   <a href="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/ci.yml"><img src="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/platforms-linux%20%7C%20windows%20%7C%20macos-blue" alt="Supported Platforms">
   <a href="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/github-code-scanning/codeql"><img src="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/github-code-scanning/codeql/badge.svg" alt="CodeQL"></a>
-  <a href="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/release.yml"><img src="https://github.com/muhammad-fiaz/archive.zig/actions/workflows/release.yml/badge.svg" alt="Release"></a>
   <a href="https://github.com/muhammad-fiaz/archive.zig/releases/latest"><img src="https://img.shields.io/github/v/release/muhammad-fiaz/archive.zig?label=Latest%20Release&style=flat-square" alt="Latest Release"></a>
   <a href="https://pay.muhammadfiaz.com"><img src="https://img.shields.io/badge/Sponsor-pay.muhammadfiaz.com-ff69b4?style=flat&logo=heart" alt="Sponsor"></a>
   <a href="https://github.com/sponsors/muhammad-fiaz"><img src="https://img.shields.io/badge/Sponsor-💖-pink?style=social&logo=github" alt="GitHub Sponsors"></a>
@@ -43,7 +42,8 @@ All-in-One archive and compression library for Zig, supporting multiple compress
 - [Installation](#installation)
   - [Method 1: Zig Fetch (Recommended)](#method-1-zig-fetch-recommended)
   - [Method 2: Manual Configuration](#method-2-manual-configuration)
-  - [Method 3: Building from Source](#method-3-building-from-source)
+  - [Method 3: Nightly / Dev Branch](#method-3-nightly--dev-branch)
+  - [Method 4: Building from Source](#method-4-building-from-source)
 - [Quick Start](#quick-start)
 - [Usage Examples](#usage-examples)
   - [Basic Compression](#basic-compression)
@@ -171,7 +171,18 @@ const archive = b.dependency("archive", .{
 exe.root_module.addImport("archive", archive.module("archive"));
 ```
 
-### Method 3: Building from Source
+### Method 3: Nightly / Dev Branch
+
+Install directly from the latest commit on the `main` branch:
+
+```bash
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig.git
+```
+
+> [!NOTE]
+> This always pulls the latest code from `main`. Use this for early access to new features and bug fixes before an official release.
+
+### Method 4: Building from Source
 
 Clone the repository and build Archive.zig:
 
