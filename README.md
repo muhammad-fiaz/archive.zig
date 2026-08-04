@@ -311,7 +311,7 @@ pub fn fileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
     std.debug.print("Verified: {}\n", .{std.mem.eql(u8, file_data, decompressed)});
     
     // Cleanup
-    std.fs.cwd().deleteFile("output.zst") catch {};
+    std.Io.Dir.cwd().deleteFile(io, "output.zst") catch {};
 }
 ```
 

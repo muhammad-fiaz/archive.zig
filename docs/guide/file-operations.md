@@ -10,9 +10,9 @@ Archive.zig provides convenient functions for working directly with files, handl
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm) !void {
+pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm, io: std.Io) !void {
     // Read input file
-    const input_data = try std.fs.cwd().readFileAlloc(allocator, input_path, 100 * 1024 * 1024); // 100MB max
+    const input_data = try std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(100 * 1024 * 1024)); // 100MB max
     defer allocator.free(input_data);
     
     // Compress data
@@ -20,7 +20,7 @@ pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output
     defer allocator.free(compressed);
     
     // Write compressed file
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input_data.len)) * 100;
     std.debug.print("Compressed {s} -> {s} ({d:.1}%)\n", .{ input_path, output_path, ratio });
@@ -30,9 +30,9 @@ pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output
 ### Decompress Files
 
 ```zig
-pub fn decompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn decompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     // Read compressed file
-    const compressed_data = try std.fs.cwd().readFileAlloc(allocator, input_path, 100 * 1024 * 1024);
+    const compressed_data = try std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(100 * 1024 * 1024));
     defer allocator.free(compressed_data);
     
     // Decompress
@@ -40,7 +40,7 @@ pub fn decompressFile(allocator: std.mem.Allocator, input_path: []const u8, outp
     defer allocator.free(decompressed);
     
     // Write decompressed file
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = decompressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = decompressed });
     
     std.debug.print("Decompressed {s} -> {s}\n", .{ input_path, output_path });
 }
@@ -51,7 +51,7 @@ pub fn decompressFile(allocator: std.mem.Allocator, input_path: []const u8, outp
 ### Compress Directory
 
 ```zig
-pub fn compressDirectory(allocator: std.mem.Allocator, dir_path: []const u8, output_path: []const u8) !void {
+pub fn compressDirectory(allocator: std.mem.Allocator, dir_path: []const u8, output_path: []const u8, io: std.Io) !void {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const arena_allocator = arena.allocator();
@@ -60,11 +60,11 @@ pub fn compressDirectory(allocator: std.mem.Allocator, dir_path: []const u8, out
     var data = std.ArrayList(u8).empty;
     
     // Collect all files in directory
-    try collectFiles(arena_allocator, dir_path, &files);
+    try collectFiles(arena_allocator, dir_path, &files, io);
     
     // Combine all file data
     for (files.items) |file_path| {
-        const file_data = try std.fs.cwd().readFileAlloc(arena_allocator, file_path, 10 * 1024 * 1024);
+        const file_data = try std.Io.Dir.cwd().readFileAlloc(io, file_path, arena_allocator, .limited(10 * 1024 * 1024));
         
         // Add file header (simple format: path_length + path + data_length + data)
         const path_len = @as(u32, @intCast(file_path.len));
@@ -81,13 +81,13 @@ pub fn compressDirectory(allocator: std.mem.Allocator, dir_path: []const u8, out
     defer allocator.free(compressed);
     
     // Write compressed archive
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     std.debug.print("Compressed directory {s} -> {s} ({d} files)\n", .{ dir_path, output_path, files.items.len });
 }
 
-fn collectFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.ArrayList([]const u8)) !void {
-    var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
+fn collectFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.ArrayList([]const u8), io: std.Io) !void {
+    var dir = try std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
     defer dir.close();
     
     var iterator = dir.iterate();
@@ -96,7 +96,7 @@ fn collectFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.
         
         switch (entry.kind) {
             .file => try files.append(full_path),
-            .directory => try collectFiles(allocator, full_path, files),
+            .directory => try collectFiles(allocator, full_path, files, io),
             else => {},
         }
     }
@@ -108,11 +108,11 @@ fn collectFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.
 ### Stream Compress Large Files
 
 ```zig
-pub fn streamCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn streamCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var buffer: [64 * 1024]u8 = undefined; // 64KB buffer
@@ -142,11 +142,11 @@ pub fn streamCompressFile(allocator: std.mem.Allocator, input_path: []const u8, 
 ### Stream Decompress Large Files
 
 ```zig
-pub fn streamDecompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn streamDecompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     while (true) {
@@ -180,9 +180,9 @@ pub fn streamDecompressFile(allocator: std.mem.Allocator, input_path: []const u8
 ### File Information
 
 ```zig
-pub fn getFileInfo(allocator: std.mem.Allocator, file_path: []const u8) !void {
-    const file_stat = try std.fs.cwd().statFile(file_path);
-    const file_data = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024); // Read first 1KB
+pub fn getFileInfo(allocator: std.mem.Allocator, file_path: []const u8, io: std.Io) !void {
+    const file_stat = try std.Io.Dir.cwd().statFile(io, file_path, .{});
+    const file_data = try std.Io.Dir.cwd().readFileAlloc(io, file_path, allocator, .limited(1024)); // Read first 1KB
     defer allocator.free(file_data);
     
     std.debug.print("File: {s}\n", .{file_path});
@@ -190,7 +190,7 @@ pub fn getFileInfo(allocator: std.mem.Allocator, file_path: []const u8) !void {
     std.debug.print("Modified: {d}\n", .{file_stat.mtime});
     
     // Decompress to get size
-    const full_data = try std.fs.cwd().readFileAlloc(allocator, file_path, @intCast(file_stat.size));
+    const full_data = try std.Io.Dir.cwd().readFileAlloc(io, file_path, allocator, .limited(@intCast(file_stat.size)));
     defer allocator.free(full_data);
     
     if (archive.decompress(allocator, full_data, .zstd)) |decompressed| {
@@ -207,8 +207,8 @@ pub fn getFileInfo(allocator: std.mem.Allocator, file_path: []const u8) !void {
 ### Batch Operations
 
 ```zig
-pub fn batchCompress(allocator: std.mem.Allocator, pattern: []const u8, algorithm: archive.Algorithm) !void {
-    var dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
+pub fn batchCompress(allocator: std.mem.Allocator, pattern: []const u8, algorithm: archive.Algorithm, io: std.Io) !void {
+    var dir = try std.Io.Dir.cwd().openDir(io, ".", .{ .iterate = true });
     defer dir.close();
     
     var iterator = dir.iterate();
@@ -222,7 +222,7 @@ pub fn batchCompress(allocator: std.mem.Allocator, pattern: []const u8, algorith
         const output_path = try std.fmt.allocPrint(allocator, "{s}.{s}", .{ input_path, @tagName(algorithm) });
         defer allocator.free(output_path);
         
-        compressFile(allocator, input_path, output_path, algorithm) catch |err| {
+        compressFile(allocator, input_path, output_path, algorithm, io) catch |err| {
             std.debug.print("Error compressing {s}: {}\n", .{ input_path, err });
             continue;
         };
@@ -235,19 +235,19 @@ pub fn batchCompress(allocator: std.mem.Allocator, pattern: []const u8, algorith
 ### Atomic File Operations
 
 ```zig
-pub fn atomicCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm) !void {
+pub fn atomicCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm, io: std.Io) !void {
     const temp_path = try std.fmt.allocPrint(allocator, "{s}.tmp", .{output_path});
     defer allocator.free(temp_path);
     
     // Compress to temporary file first
-    compressFile(allocator, input_path, temp_path, algorithm) catch |err| {
+    compressFile(allocator, input_path, temp_path, algorithm, io) catch |err| {
         // Clean up temp file on error
-        std.fs.cwd().deleteFile(temp_path) catch {};
+        std.Io.Dir.cwd().deleteFile(io, temp_path) catch {};
         return err;
     };
     
     // Atomically rename temp file to final name
-    try std.fs.cwd().rename(temp_path, output_path);
+    try std.Io.Dir.cwd().rename(io, temp_path, output_path);
     
     std.debug.print("Atomically compressed {s} -> {s}\n", .{ input_path, output_path });
 }
@@ -256,7 +256,7 @@ pub fn atomicCompressFile(allocator: std.mem.Allocator, input_path: []const u8, 
 ### File Backup and Compression
 
 ```zig
-pub fn backupAndCompress(allocator: std.mem.Allocator, file_path: []const u8) !void {
+pub fn backupAndCompress(allocator: std.mem.Allocator, file_path: []const u8, io: std.Io) !void {
     const backup_path = try std.fmt.allocPrint(allocator, "{s}.backup", .{file_path});
     defer allocator.free(backup_path);
     
@@ -264,18 +264,18 @@ pub fn backupAndCompress(allocator: std.mem.Allocator, file_path: []const u8) !v
     defer allocator.free(compressed_path);
     
     // Create backup
-    try std.fs.cwd().copyFile(file_path, std.fs.cwd(), backup_path, .{});
+    try std.Io.Dir.cwd().copyFile(io, file_path, std.Io.Dir.cwd(), backup_path, .{});
     
     // Compress original
-    compressFile(allocator, file_path, compressed_path, .gzip) catch |err| {
+    compressFile(allocator, file_path, compressed_path, .gzip, io) catch |err| {
         // Restore from backup on error
-        std.fs.cwd().copyFile(backup_path, std.fs.cwd(), file_path, .{}) catch {};
-        std.fs.cwd().deleteFile(backup_path) catch {};
+        std.Io.Dir.cwd().copyFile(io, backup_path, std.Io.Dir.cwd(), file_path, .{}) catch {};
+        std.Io.Dir.cwd().deleteFile(io, backup_path) catch {};
         return err;
     };
     
     // Remove backup on success
-    try std.fs.cwd().deleteFile(backup_path);
+    try std.Io.Dir.cwd().deleteFile(io, backup_path);
     
     std.debug.print("Backed up and compressed {s}\n", .{file_path});
 }
@@ -284,8 +284,8 @@ pub fn backupAndCompress(allocator: std.mem.Allocator, file_path: []const u8) !v
 ### File Integrity Verification
 
 ```zig
-pub fn verifyCompressedFile(allocator: std.mem.Allocator, compressed_path: []const u8, original_path: ?[]const u8) !bool {
-    const compressed_data = try std.fs.cwd().readFileAlloc(allocator, compressed_path, 100 * 1024 * 1024);
+pub fn verifyCompressedFile(allocator: std.mem.Allocator, compressed_path: []const u8, original_path: ?[]const u8, io: std.Io) !bool {
+    const compressed_data = try std.Io.Dir.cwd().readFileAlloc(io, compressed_path, allocator, .limited(100 * 1024 * 1024));
     defer allocator.free(compressed_data);
     
     // Decompress
@@ -297,7 +297,7 @@ pub fn verifyCompressedFile(allocator: std.mem.Allocator, compressed_path: []con
     
     // Compare with original if provided
     if (original_path) |orig_path| {
-        const original_data = try std.fs.cwd().readFileAlloc(allocator, orig_path, 100 * 1024 * 1024);
+        const original_data = try std.Io.Dir.cwd().readFileAlloc(io, orig_path, allocator, .limited(100 * 1024 * 1024));
         defer allocator.free(original_data);
         
         if (std.mem.eql(u8, original_data, decompressed)) {
@@ -319,14 +319,14 @@ pub fn verifyCompressedFile(allocator: std.mem.Allocator, compressed_path: []con
 ### Using Compression Configurations
 
 ```zig
-pub fn compressWithConfig(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, config: archive.CompressionConfig) !void {
-    const input_data = try std.fs.cwd().readFileAlloc(allocator, input_path, 100 * 1024 * 1024);
+pub fn compressWithConfig(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, config: archive.CompressionConfig, io: std.Io) !void {
+    const input_data = try std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(100 * 1024 * 1024));
     defer allocator.free(input_data);
     
     const compressed = try archive.compressWithConfig(allocator, input_data, config);
     defer allocator.free(compressed);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     const ratio = @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input_data.len)) * 100;
     std.debug.print("Compressed {s} -> {s} ({d:.1}%) using {s}\n", .{ input_path, output_path, ratio, @tagName(config.algorithm) });
@@ -336,7 +336,7 @@ pub fn compressWithConfig(allocator: std.mem.Allocator, input_path: []const u8, 
 ### Directory Filtering
 
 ```zig
-pub fn compressFilteredDirectory(allocator: std.mem.Allocator, dir_path: []const u8, output_path: []const u8) !void {
+pub fn compressFilteredDirectory(allocator: std.mem.Allocator, dir_path: []const u8, output_path: []const u8, io: std.Io) !void {
     const exclude_rules = [_]archive.FilterRule{
         .{ .pattern = "*.tmp", .is_directory = false },
         .{ .pattern = "*.log", .is_directory = false },
@@ -355,11 +355,11 @@ pub fn compressFilteredDirectory(allocator: std.mem.Allocator, dir_path: []const
     const arena_allocator = arena.allocator();
     
     var files = .empty;
-    try collectFilteredFiles(arena_allocator, dir_path, &files, config);
+    try collectFilteredFiles(arena_allocator, dir_path, &files, config, io);
     
     var data = std.ArrayList(u8).empty;
     for (files.items) |file_path| {
-        const file_data = try std.fs.cwd().readFileAlloc(arena_allocator, file_path, 10 * 1024 * 1024);
+        const file_data = try std.Io.Dir.cwd().readFileAlloc(io, file_path, arena_allocator, .limited(10 * 1024 * 1024));
         
         const path_len = @as(u32, @intCast(file_path.len));
         const data_len = @as(u32, @intCast(file_data.len));
@@ -373,13 +373,13 @@ pub fn compressFilteredDirectory(allocator: std.mem.Allocator, dir_path: []const
     const compressed = try archive.compressWithConfig(allocator, data.items, config);
     defer allocator.free(compressed);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     std.debug.print("Compressed filtered directory {s} -> {s} ({d} files)\n", .{ dir_path, output_path, files.items.len });
 }
 
-fn collectFilteredFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.ArrayList([]const u8), config: archive.CompressionConfig) !void {
-    var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
+fn collectFilteredFiles(allocator: std.mem.Allocator, dir_path: []const u8, files: *std.ArrayList([]const u8), config: archive.CompressionConfig, io: std.Io) !void {
+    var dir = try std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
     defer dir.close();
     
     var iterator = dir.iterate();
@@ -394,7 +394,7 @@ fn collectFilteredFiles(allocator: std.mem.Allocator, dir_path: []const u8, file
             },
             .directory => {
                 if (config.path_filter.shouldInclude(full_path, true) and config.recursive) {
-                    try collectFilteredFiles(allocator, full_path, files, config);
+                    try collectFilteredFiles(allocator, full_path, files, config, io);
                 }
             },
             else => {},
@@ -408,9 +408,9 @@ fn collectFilteredFiles(allocator: std.mem.Allocator, dir_path: []const u8, file
 ### Robust File Operations
 
 ```zig
-pub fn robustCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm) !void {
+pub fn robustCompressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm, io: std.Io) !void {
     // Check if input file exists and is readable
-    const input_stat = std.fs.cwd().statFile(input_path) catch |err| switch (err) {
+    const input_stat = std.Io.Dir.cwd().statFile(io, input_path, .{}) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("Error: Input file '{s}' not found\n", .{input_path});
             return err;
@@ -428,7 +428,7 @@ pub fn robustCompressFile(allocator: std.mem.Allocator, input_path: []const u8, 
     }
     
     // Read input file
-    const input_data = std.fs.cwd().readFileAlloc(allocator, input_path, @intCast(input_stat.size)) catch |err| switch (err) {
+    const input_data = std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(@intCast(input_stat.size))) catch |err| switch (err) {
         error.OutOfMemory => {
             std.debug.print("Error: Not enough memory to read file ({d} bytes)\n", .{input_stat.size});
             return err;
@@ -452,7 +452,7 @@ pub fn robustCompressFile(allocator: std.mem.Allocator, input_path: []const u8, 
     defer allocator.free(compressed);
     
     // Write output file
-    std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed }) catch |err| switch (err) {
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed }) catch |err| switch (err) {
         error.AccessDenied => {
             std.debug.print("Error: Cannot write to output file '{s}' (access denied)\n", .{output_path});
             return err;

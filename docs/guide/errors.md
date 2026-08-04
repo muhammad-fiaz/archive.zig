@@ -184,9 +184,9 @@ pub fn retryCompress(allocator: std.mem.Allocator, data: []const u8, algorithm: 
 ### Robust File Compression
 
 ```zig
-pub fn robustFileCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn robustFileCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     // Check input file
-    const input_stat = std.fs.cwd().statFile(input_path) catch |err| switch (err) {
+    const input_stat = std.Io.Dir.cwd().statFile(io, input_path, .{}) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("Error: Input file '{s}' not found\n", .{input_path});
             std.debug.print("Please check the file path and try again\n", .{});
@@ -215,7 +215,7 @@ pub fn robustFileCompress(allocator: std.mem.Allocator, input_path: []const u8, 
     }
     
     // Read input file
-    const input_data = std.fs.cwd().readFileAlloc(allocator, input_path, @intCast(input_stat.size)) catch |err| switch (err) {
+    const input_data = std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(@intCast(input_stat.size))) catch |err| switch (err) {
         error.OutOfMemory => {
             std.debug.print("Error: Not enough memory to read file ({d} bytes)\n", .{input_stat.size});
             std.debug.print("Try using streaming compression or increase available memory\n", .{});
@@ -257,7 +257,7 @@ pub fn robustFileCompress(allocator: std.mem.Allocator, input_path: []const u8, 
     defer allocator.free(compressed);
     
     // Write output file
-    std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed }) catch |err| switch (err) {
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed }) catch |err| switch (err) {
         error.AccessDenied => {
             std.debug.print("Error: Cannot write to output file '{s}'\n", .{output_path});
             std.debug.print("Check directory permissions\n", .{});
@@ -359,9 +359,9 @@ pub const ErrorLogger = struct {
     allocator: std.mem.Allocator,
     log_file: ?std.fs.File,
     
-    pub fn init(allocator: std.mem.Allocator, log_path: ?[]const u8) !ErrorLogger {
+    pub fn init(allocator: std.mem.Allocator, log_path: ?[]const u8, io: std.Io) !ErrorLogger {
         const log_file = if (log_path) |path|
-            try std.fs.cwd().createFile(path, .{ .truncate = false })
+            try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = false })
         else
             null;
         
@@ -411,7 +411,7 @@ pub const ErrorLogger = struct {
 };
 
 pub fn compressWithLogging(allocator: std.mem.Allocator, data: []const u8, algorithm: archive.Algorithm) ![]u8 {
-    var logger = try ErrorLogger.init(allocator, "compression.log");
+    var logger = try ErrorLogger.init(allocator, "compression.log", io);
     defer logger.deinit();
     
     const compressed = archive.compress(allocator, data, algorithm) catch |err| {
@@ -504,8 +504,8 @@ pub fn testErrorConditions(allocator: std.mem.Allocator) !void {
 ### Example: Production-Ready Error Handling
 
 ```zig
-pub fn productionCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    var logger = try ErrorLogger.init(allocator, "production.log");
+pub fn productionCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    var logger = try ErrorLogger.init(allocator, "production.log", io);
     defer logger.deinit();
     
     // Validate inputs
@@ -515,7 +515,7 @@ pub fn productionCompress(allocator: std.mem.Allocator, input_path: []const u8, 
     }
     
     // Check input file
-    const input_stat = std.fs.cwd().statFile(input_path) catch |err| {
+    const input_stat = std.Io.Dir.cwd().statFile(io, input_path, .{}) catch |err| {
         const context = std.fmt.allocPrint(allocator, "Input file: {s}", .{input_path}) catch "Unknown file";
         defer allocator.free(context);
         logger.logError("productionCompress", err, context);
@@ -531,7 +531,7 @@ pub fn productionCompress(allocator: std.mem.Allocator, input_path: []const u8, 
         return error.FileTooBig;
     }
     
-    const input_data = std.fs.cwd().readFileAlloc(allocator, input_path, @intCast(input_stat.size)) catch |err| {
+    const input_data = std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(@intCast(input_stat.size))) catch |err| {
         const context = std.fmt.allocPrint(allocator, "Reading {s} ({d} bytes)", .{ input_path, input_stat.size }) catch "Read error";
         defer allocator.free(context);
         logger.logError("productionCompress", err, context);
@@ -564,15 +564,15 @@ pub fn productionCompress(allocator: std.mem.Allocator, input_path: []const u8, 
     };
     defer allocator.free(temp_path);
     
-    std.fs.cwd().writeFile(.{ .sub_path = temp_path, .data = compressed }) catch |err| {
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = temp_path, .data = compressed }) catch |err| {
         const context = std.fmt.allocPrint(allocator, "Writing to {s}", .{temp_path}) catch "Write error";
         defer allocator.free(context);
         logger.logError("productionCompress", err, context);
         return err;
     };
     
-    std.fs.cwd().rename(temp_path, output_path) catch |err| {
-        std.fs.cwd().deleteFile(temp_path) catch {}; // Clean up temp file
+    std.Io.Dir.cwd().rename(io, temp_path, output_path) catch |err| {
+        std.Io.Dir.cwd().deleteFile(io, temp_path) catch {}; // Clean up temp file
         const context = std.fmt.allocPrint(allocator, "Renaming {s} to {s}", .{ temp_path, output_path }) catch "Rename error";
         defer allocator.free(context);
         logger.logError("productionCompress", err, context);

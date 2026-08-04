@@ -12,6 +12,7 @@ const archive = @import("archive");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
+    const io = init.io;
 
     const input = "Hello, Archive.zig!";
     
@@ -66,9 +67,9 @@ Work directly with files:
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     // Read input file
-    const input_data = try std.fs.cwd().readFileAlloc(allocator, input_path, 1024 * 1024 * 10); // 10MB max
+    const input_data = try std.Io.Dir.cwd().readFileAlloc(io, input_path, allocator, .limited(1024 * 1024 * 10)); // 10MB max
     defer allocator.free(input_data);
     
     // Compress
@@ -76,7 +77,7 @@ pub fn compressFile(allocator: std.mem.Allocator, input_path: []const u8, output
     defer allocator.free(compressed);
     
     // Write compressed file
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     std.debug.print("Compressed {s} -> {s}\n", .{ input_path, output_path });
 }
@@ -145,7 +146,7 @@ pub fn processData(allocator: std.mem.Allocator, data: []const u8) !void {
 const files = [_][]const u8{ "file1.txt", "file2.txt", "file3.txt" };
 
 for (files) |filename| {
-    const input_data = try std.fs.cwd().readFileAlloc(allocator, filename, 1024 * 1024);
+    const input_data = try std.Io.Dir.cwd().readFileAlloc(io, filename, allocator, .limited(1024 * 1024));
     defer allocator.free(input_data);
     
     const compressed = try archive.compress(allocator, input_data, .gzip);
@@ -154,18 +155,18 @@ for (files) |filename| {
     const output_name = try std.fmt.allocPrint(allocator, "{s}.gz", .{filename});
     defer allocator.free(output_name);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = output_name, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_name, .data = compressed });
 }
 ```
 
 ### Streaming Large Files
 
 ```zig
-pub fn compressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn compressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var buffer: [8192]u8 = undefined;

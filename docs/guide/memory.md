@@ -56,11 +56,11 @@ pub fn arenaAllocatorExample(base_allocator: std.mem.Allocator) !void {
 ### Streaming for Large Files
 
 ```zig
-pub fn memoryEfficientFileCompression(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn memoryEfficientFileCompression(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     // Use small buffer to minimize memory usage

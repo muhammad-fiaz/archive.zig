@@ -65,11 +65,11 @@ pub fn streamDecompressExample(allocator: std.mem.Allocator, compressed_data: []
 ### Stream Compress Large Files
 
 ```zig
-pub fn streamCompressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn streamCompressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var compressor = try archive.stream.CompressStream.init(allocator, .zstd, .default);
@@ -105,11 +105,11 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator, input_path: []const
 ### Stream Decompress Large Files
 
 ```zig
-pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, algorithm: archive.Algorithm, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var decompressor = archive.stream.DecompressStream.init(allocator);
@@ -280,11 +280,11 @@ pub fn bufferedStreamExample(allocator: std.mem.Allocator) !void {
 ### Parallel Streaming
 
 ```zig
-pub fn parallelStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn parallelStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     const num_threads = 4;
@@ -336,14 +336,14 @@ fn compressChunk(allocator: std.mem.Allocator, chunk: []const u8, result: *[]u8)
 ### Configurable Streaming
 
 ```zig
-pub fn configurableStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn configurableStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     var compressor = try archive.stream.CompressStream.init(allocator, .zstd, .default);
     defer compressor.deinit();
     
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var buffer: [64 * 1024]u8 = undefined;
@@ -369,16 +369,16 @@ pub fn configurableStreamCompress(allocator: std.mem.Allocator, input_path: []co
 ### Memory-Efficient Streaming
 
 ```zig
-pub fn memoryEfficientStream(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn memoryEfficientStream(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     // Use arena allocator for temporary allocations
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const arena_allocator = arena.allocator();
     
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     var compressor = try archive.stream.CompressStream.init(arena_allocator, .lz4, .default);
@@ -409,8 +409,8 @@ pub fn memoryEfficientStream(allocator: std.mem.Allocator, input_path: []const u
 ### Robust Stream Processing
 
 ```zig
-pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = std.fs.cwd().openFile(input_path, .{}) catch |err| switch (err) {
+pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = std.Io.Dir.cwd().openFile(io, input_path, .{}) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("Error: Input file not found\n", .{});
             return err;
@@ -419,7 +419,7 @@ pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8
     };
     defer input_file.close();
     
-    const output_file = std.fs.cwd().createFile(output_path, .{}) catch |err| switch (err) {
+    const output_file = std.Io.Dir.cwd().createFile(io, output_path, .{}) catch |err| switch (err) {
         error.AccessDenied => {
             std.debug.print("Error: Cannot create output file\n", .{});
             return err;
@@ -479,17 +479,17 @@ pub fn robustStreamCompress(allocator: std.mem.Allocator, input_path: []const u8
 ### Optimizing Stream Performance
 
 ```zig
-pub fn optimizedStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
+pub fn optimizedStreamCompress(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
     // Use larger buffers for better performance
     const buffer_size = 1024 * 1024; // 1MB buffer
     
     var compressor = try archive.stream.CompressStream.init(allocator, .lz4, .default);
     defer compressor.deinit();
     
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     // Pre-allocate buffer
