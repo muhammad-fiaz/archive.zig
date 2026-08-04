@@ -1,16 +1,20 @@
+---
+title: Archive API
+---
+
 # Archive API
 
-The main Archive.zig API provides simple functions for compression and decompression.
+The main `archive.zig` module provides free functions, an `Archive` struct, and a `Compressor` struct for compression and decompression.
 
-## Core Functions
+## Free Functions
 
 ### `compress`
 
 ```zig
-pub fn compress(allocator: Allocator, data: []const u8, algorithm: Algorithm) ![]u8
+pub fn compress(allocator: std.mem.Allocator, data: []const u8, algorithm: Algorithm) ![]u8
 ```
 
-Compresses data using the specified algorithm.
+Compresses data using the specified algorithm with default settings.
 
 **Parameters:**
 - `allocator`: Memory allocator
@@ -28,7 +32,7 @@ defer allocator.free(compressed);
 ### `decompress`
 
 ```zig
-pub fn decompress(allocator: Allocator, data: []const u8, algorithm: Algorithm) ![]u8
+pub fn decompress(allocator: std.mem.Allocator, data: []const u8, algorithm: Algorithm) ![]u8
 ```
 
 Decompresses data using the specified algorithm.
@@ -49,7 +53,7 @@ defer allocator.free(decompressed);
 ### `compressWithConfig`
 
 ```zig
-pub fn compressWithConfig(allocator: Allocator, data: []const u8, config: CompressionConfig) ![]u8
+pub fn compressWithConfig(allocator: std.mem.Allocator, data: []const u8, cfg: CompressionConfig) ![]u8
 ```
 
 Compresses data with custom configuration.
@@ -57,91 +61,190 @@ Compresses data with custom configuration.
 **Parameters:**
 - `allocator`: Memory allocator
 - `data`: Input data to compress
-- `config`: Compression configuration
+- `cfg`: Compression configuration
 
 **Returns:** Compressed data (caller owns memory)
 
 **Example:**
 ```zig
-const config = archive.CompressionConfig.best();
-const compressed = try archive.compressWithConfig(allocator, data, config);
+const cfg = archive.CompressionConfig.init(.zstd).withZstdLevel(10);
+const compressed = try archive.compressWithConfig(allocator, data, cfg);
 defer allocator.free(compressed);
 ```
 
-## Auto-Detection Functions
-
-### `detectAlgorithm`
+### `decompressWithConfig`
 
 ```zig
-pub fn detectAlgorithm(data: []const u8) ?Algorithm
+pub fn decompressWithConfig(allocator: std.mem.Allocator, data: []const u8, cfg: CompressionConfig) ![]u8
 ```
 
-Automatically detects the compression algorithm from data headers.
-
-**Parameters:**
-- `data`: Compressed data
-
-**Returns:** Detected algorithm or `null` if unknown
-
-**Example:**
-```zig
-if (archive.detectAlgorithm(compressed_data)) |algo| {
-    std.debug.print("Detected: {s}\n", .{@tagName(algo)});
-}
-```
-
-### `autoDecompress`
-
-```zig
-pub fn autoDecompress(allocator: Allocator, data: []const u8) ![]u8
-```
-
-Automatically detects algorithm and decompresses data.
+Decompresses data with custom configuration.
 
 **Parameters:**
 - `allocator`: Memory allocator
-- `data`: Compressed data
+- `data`: Compressed data to decompress
+- `cfg`: Compression configuration
 
 **Returns:** Decompressed data (caller owns memory)
 
 **Example:**
 ```zig
-const decompressed = try archive.autoDecompress(allocator, compressed_data);
+const cfg = archive.CompressionConfig.init(.zstd).withZstdLevel(10);
+const decompressed = try archive.decompressWithConfig(allocator, data, cfg);
+defer allocator.free(decompressed);
+```
+
+## Archive Struct
+
+```zig
+pub const Archive = struct {
+    allocator: std.mem.Allocator,
+    cfg: CompressionConfig,
+
+    pub fn init(allocator: std.mem.Allocator, cfg: CompressionConfig) Archive
+    pub fn deinit(self: *Archive) void
+    pub fn compress(self: *Archive, data: []const u8) ![]u8
+    pub fn decompress(self: *Archive, data: []const u8) ![]u8
+};
+```
+
+### `init`
+
+```zig
+pub fn init(allocator: std.mem.Allocator, cfg: CompressionConfig) Archive
+```
+
+Creates a new `Archive` with the given allocator and configuration.
+
+### `deinit`
+
+```zig
+pub fn deinit(self: *Archive) void
+```
+
+Cleans up the archive (currently a no-op, but should be called for forward compatibility).
+
+### `compress`
+
+```zig
+pub fn compress(self: *Archive, data: []const u8) ![]u8
+```
+
+Compresses data using the archive's configured algorithm and settings.
+
+### `decompress`
+
+```zig
+pub fn decompress(self: *Archive, data: []const u8) ![]u8
+```
+
+Decompresses data using the archive's configured algorithm and settings.
+
+### Usage Example
+
+```zig
+const std = @import("std");
+const archive = @import("archive");
+
+pub fn archiveExample(allocator: std.mem.Allocator) !void {
+    const cfg = archive.CompressionConfig.init(.zstd)
+        .withZstdLevel(10)
+        .withChecksum();
+
+    var arch = archive.Archive.init(allocator, cfg);
+    defer arch.deinit();
+
+    const compressed = try arch.compress("Data to compress");
+    defer allocator.free(compressed);
+
+    const decompressed = try arch.decompress(compressed);
+    defer allocator.free(decompressed);
+}
+```
+
+## Compressor Struct
+
+```zig
+pub const Compressor = struct {
+    allocator: std.mem.Allocator,
+    algorithm: Algorithm,
+    level: ?u8 = null,
+    zstd_level: ?c_int = null,
+    checksum: bool = false,
+
+    pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) Compressor
+    pub fn withLevel(self: Compressor, level: u8) Compressor
+    pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+    pub fn withChecksum(self: Compressor) Compressor
+    pub fn compress_data(self: Compressor, data: []const u8) ![]u8
+    pub fn decompress_data(self: Compressor, data: []const u8) ![]u8
+};
+```
+
+A builder-style interface for one-off compress/decompress operations.
+
+### `init`
+
+```zig
+pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) Compressor
+```
+
+Creates a new `Compressor` for the given algorithm.
+
+### `withLevel`
+
+```zig
+pub fn withLevel(self: Compressor, level: u8) Compressor
+```
+
+Sets the compression level (0-9 for most algorithms).
+
+### `withZstdLevel`
+
+```zig
+pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+```
+
+Sets the Zstandard-specific compression level (1-22).
+
+### `withChecksum`
+
+```zig
+pub fn withChecksum(self: Compressor) Compressor
+```
+
+Enables checksum verification.
+
+### `compress_data`
+
+```zig
+pub fn compress_data(self: Compressor, data: []const u8) ![]u8
+```
+
+Compresses data using the configured settings.
+
+### `decompress_data`
+
+```zig
+pub fn decompress_data(self: Compressor, data: []const u8) ![]u8
+```
+
+Decompresses data using the configured settings.
+
+### Compressor Example
+
+```zig
+const compressor = archive.Compressor.init(allocator, .zstd)
+    .withZstdLevel(15)
+    .withChecksum();
+
+const compressed = try compressor.compress_data("Hello, World!");
+defer allocator.free(compressed);
+
+const decompressed = try compressor.decompress_data(compressed);
 defer allocator.free(decompressed);
 ```
 
 ## Error Handling
 
-All functions return errors for various failure conditions:
-
-```zig
-const CompressError = error{
-    OutOfMemory,
-    InvalidData,
-    InvalidMagic,
-    UnsupportedAlgorithm,
-    CorruptedStream,
-    ChecksumMismatch,
-    InvalidOffset,
-    InvalidTarArchive,
-    ZstdError,
-    UnsupportedCompressionMethod,
-    ZipUncompressSizeMismatch,
-    InvalidZipArchive,
-};
-```
-
-**Example with error handling:**
-```zig
-const compressed = archive.compress(allocator, data, .gzip) catch |err| switch (err) {
-    error.OutOfMemory => {
-        std.debug.print("Not enough memory\n", .{});
-        return;
-    },
-    error.InvalidData => {
-        std.debug.print("Invalid input data\n", .{});
-        return;
-    },
-    else => return err,
-};
-```
+All functions return `CompressError` for various failure conditions. See [Errors](./errors.md) for the full error set.

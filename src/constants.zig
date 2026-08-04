@@ -1,13 +1,13 @@
 const std = @import("std");
 
 pub const TimeConstants = struct {
-    pub const ns_per_us: u64 = 1_000;
-    pub const ns_per_ms: u64 = 1_000_000;
-    pub const ns_per_second: u64 = 1_000_000_000;
+    pub const ns_per_us: u64 = std.time.ns_per_us;
+    pub const ns_per_ms: u64 = std.time.ns_per_ms;
+    pub const ns_per_second: u64 = std.time.ns_per_s;
     pub const ms_per_second: u64 = 1000;
-    pub const seconds_per_minute: u64 = 60;
-    pub const seconds_per_hour: u64 = 3600;
-    pub const seconds_per_day: u64 = 86400;
+    pub const seconds_per_minute: u64 = std.time.s_per_min;
+    pub const seconds_per_hour: u64 = std.time.s_per_hour;
+    pub const seconds_per_day: u64 = std.time.s_per_day;
 };
 
 pub const SizeConstants = struct {
@@ -30,6 +30,8 @@ pub const BufferSizes = struct {
     pub const zstd_in: usize = 128 * 1024;
     pub const zstd_out: usize = 128 * 1024;
     pub const lz4_block_max: usize = 4 * 1024 * 1024;
+    /// Minimum buffer size for std.compress.flate (must be >= flate.max_window_len).
+    pub const flate_min: usize = std.compress.flate.max_window_len;
 };
 
 pub const CompressionConstants = struct {
@@ -121,6 +123,7 @@ pub const Extensions = struct {
     pub const lz4: []const u8 = ".lz4";
     pub const deflate: []const u8 = ".deflate";
     pub const zlib_ext: []const u8 = ".zlib";
+    pub const brotli: []const u8 = ".br";
     pub const none: []const u8 = "";
 };
 

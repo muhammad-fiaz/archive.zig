@@ -91,7 +91,7 @@ body:
       placeholder: |
         Clearly describe what's wrong or missing...
         
-        Example: "The installation instructions don't mention that Zig 0.15.0 is required, which causes confusion for users with older versions."
+        Example: "The installation instructions don't mention that Zig 0.16.0 is required, which causes confusion for users with older versions."
     validations:
       required: true
 
@@ -108,7 +108,7 @@ body:
         ```markdown
         ## Prerequisites
         
-        - Zig 0.15.0 or later (download from [ziglang.org](https://ziglang.org/download/))
+        - Zig 0.16.0 or later (download from [ziglang.org](https://ziglang.org/download/))
         ```
     validations:
       required: false

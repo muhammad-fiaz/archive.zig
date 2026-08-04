@@ -12,11 +12,19 @@ pub fn build(b: *std.Build) void {
     });
     const zstd_mod = zstd_dep.module("zstd");
 
-    // Create the archive module with zstd support
+    // Resolve brotli dependency
+    const brotli_dep = b.dependency("brotli", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const brotli_mod = brotli_dep.module("brotli");
+
+    // Create the archive module with zstd and brotli support
     const archive_module = b.createModule(.{
         .root_source_file = b.path("src/archive.zig"),
     });
     archive_module.addImport("zstd", zstd_mod);
+    archive_module.addImport("brotli", brotli_mod);
 
     // Expose the module for external projects that depend on this package.
     // This allows users to do: `const archive = @import("archive");` in their code
@@ -25,6 +33,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/archive.zig"),
     });
     exposed_module.addImport("zstd", zstd_mod);
+    exposed_module.addImport("brotli", brotli_mod);
 
     const examples = [_]struct { name: []const u8, path: []const u8, skip_run_all: bool = false }{
         .{ .name = "main", .path = "examples/main.zig" },
@@ -93,6 +102,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     tests.root_module.addImport("zstd", zstd_mod);
+    tests.root_module.addImport("brotli", brotli_mod);
 
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run unit tests");
@@ -116,6 +126,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     docs_obj.root_module.addImport("zstd", zstd_mod);
+    docs_obj.root_module.addImport("brotli", brotli_mod);
 
     const install_docs = b.addInstallDirectory(.{
         .source_dir = docs_obj.getEmittedDocs(),
@@ -142,5 +153,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     lib.root_module.addImport("zstd", zstd_mod);
+    lib.root_module.addImport("brotli", brotli_mod);
     b.installArtifact(lib);
 }

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f7a41d"/>
+      <stop offset="100%" style="stop-color:#e8930f"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f0f0f0"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#d4850a" stroke-width="2"/>
+  <!-- Archive box body -->
+  <rect x="30" y="48" width="68" height="48" rx="6" fill="url(#box)" stroke="#d4850a" stroke-width="2.5"/>
+  <!-- Box lid -->
+  <rect x="26" y="40" width="76" height="16" rx="4" fill="url(#box)" stroke="#d4850a" stroke-width="2.5"/>
+  <!-- Lid handle -->
+  <rect x="50" y="33" width="28" height="10" rx="5" fill="url(#box)" stroke="#d4850a" stroke-width="2"/>
+  <!-- Arrow up (extract/decompress) -->
+  <path d="M44 72 L44 56 L38 56 L50 44 L62 56 L56 56 L56 72" fill="#d4850a" opacity="0.9"/>
+  <!-- Arrow down (compress) -->
+  <path d="M68 44 L68 60 L62 60 L74 72 L86 60 L80 60 L80 44" fill="#d4850a" opacity="0.7"/>
+  <!-- ZIP lines -->
+  <line x1="30" y1="56" x2="98" y2="56" stroke="#d4850a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="30" y1="64" x2="98" y2="64" stroke="#d4850a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="30" y1="72" x2="98" y2="72" stroke="#d4850a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="30" y1="80" x2="98" y2="80" stroke="#d4850a" stroke-width="1.5" opacity="0.5"/>
+  <line x1="30" y1="88" x2="98" y2="88" stroke="#d4850a" stroke-width="1.5" opacity="0.5"/>
+  <!-- Text -->
+  <text x="64" y="112" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="bold" fill="#ffffff">ARCHIVE</text>
+</svg>

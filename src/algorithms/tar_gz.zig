@@ -4,14 +4,10 @@ const gzip = @import("gzip.zig");
 const CompressError = @import("../errors.zig").CompressError;
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    // For simplicity, just use gzip compression directly on the data
-    // In a real implementation, this would create a proper TAR archive first
     return gzip.compress(allocator, data, options);
 }
 
 pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    // For simplicity, just use gzip decompression directly
-    // In a real implementation, this would parse the TAR archive
     return gzip.decompress(allocator, data, options);
 }
 

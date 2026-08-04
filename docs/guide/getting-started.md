@@ -9,7 +9,7 @@ Welcome to Archive.zig! This guide will help you get up and running with the lib
 The easiest way to add Archive.zig to your project:
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.1.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz
 ```
 
 This automatically adds the dependency with the correct hash to your `build.zig.zon`.
@@ -21,7 +21,7 @@ Add to your `build.zig.zon`:
 ```zig
 .dependencies = .{
     .archive = .{
-        .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.1.tar.gz",
+        .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz",
         .hash = "...", // Run zig fetch to get the hash
     },
 },
@@ -46,10 +46,8 @@ Create a simple program that compresses and decompresses data:
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     // Original data
     const input = "Hello, Archive.zig! This is a compression test.";
@@ -86,6 +84,7 @@ const algorithms = [_]archive.Algorithm{
     .xz,      // XZ format
     .tar_gz,  // TAR + gzip
     .zip,     // ZIP format
+    .brotli,  // Brotli compression
 };
 
 for (algorithms) |algo| {
@@ -102,5 +101,4 @@ for (algorithms) |algo| {
 - Learn about [Configuration](./configuration.md) options
 - Explore [File Operations](./file-operations.md)
 - Try the [Builder Pattern](./builder.md)
-- Check out [Auto-Detection](./auto-detection.md)
 - See more [Examples](../examples/basic.md)

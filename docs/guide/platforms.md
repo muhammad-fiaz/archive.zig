@@ -47,7 +47,7 @@ pub fn windowsOptimizations(allocator: std.mem.Allocator) !void {
     std.debug.print("Windows optimization: {d} bytes\n", .{compressed.len});
 }
 
-pub fn windowsFileHandling(allocator: std.mem.Allocator) !void {
+pub fn windowsFileHandling(allocator: std.mem.Allocator, io: std.Io) !void {
     if (std.builtin.os.tag != .windows) return;
     
     // Windows file path handling
@@ -55,7 +55,7 @@ pub fn windowsFileHandling(allocator: std.mem.Allocator) !void {
     const output_path = "C:\\temp\\output.gz";
     
     // Handle Windows-specific file attributes
-    const input_file = std.fs.cwd().openFile(input_path, .{}) catch |err| switch (err) {
+    const input_file = std.Io.Dir.cwd().openFile(io, input_path, .{}) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("File not found: {s}\n", .{input_path});
             return;
@@ -79,7 +79,7 @@ pub fn windowsFileHandling(allocator: std.mem.Allocator) !void {
     const compressed = try archive.compress(allocator, file_data, .gzip);
     defer allocator.free(compressed);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     std.debug.print("Windows file handling completed\n", .{});
 }
@@ -143,7 +143,7 @@ pub fn macosOptimizations(allocator: std.mem.Allocator) !void {
     std.debug.print("macOS optimization: {d} bytes\n", .{compressed.len});
 }
 
-pub fn macosResourceHandling(allocator: std.mem.Allocator) !void {
+pub fn macosResourceHandling(allocator: std.mem.Allocator, io: std.Io) !void {
     if (std.builtin.os.tag != .macos) return;
     
     // Handle macOS resource forks and extended attributes
@@ -151,7 +151,7 @@ pub fn macosResourceHandling(allocator: std.mem.Allocator) !void {
     const output_path = "/tmp/output.gz";
     
     // Check for extended attributes (simplified example)
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
     const file_data = try input_file.readToEndAlloc(allocator, 10 * 1024 * 1024);
@@ -160,7 +160,7 @@ pub fn macosResourceHandling(allocator: std.mem.Allocator) !void {
     const compressed = try archive.compress(allocator, file_data, .gzip);
     defer allocator.free(compressed);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = compressed });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = compressed });
     
     std.debug.print("macOS resource handling completed\n", .{});
 }
@@ -276,7 +276,7 @@ pub fn wasmOptimizations(allocator: std.mem.Allocator) !void {
 
 // Export functions for JavaScript interop
 export fn compress_for_js(data_ptr: [*]const u8, data_len: usize, output_ptr: [*]u8, output_len: *usize) c_int {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     

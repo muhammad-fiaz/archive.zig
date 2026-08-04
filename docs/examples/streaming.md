@@ -12,7 +12,7 @@ const archive = @import("archive");
 
 pub fn basicStreamCompression(allocator: std.mem.Allocator) !void {
     // Create a stream compressor
-    var compressor = try archive.StreamCompressor.init(allocator, .gzip);
+    var compressor = try archive.stream.CompressStream.init(allocator, .gzip, .default);
     defer compressor.deinit();
     
     // Process data in chunks
@@ -25,25 +25,16 @@ pub fn basicStreamCompression(allocator: std.mem.Allocator) !void {
     
     std.debug.print("Basic stream compression:\n");
     
-    var total_input: usize = 0;
-    var total_output: usize = 0;
-    
-    for (chunks, 0..) |chunk, i| {
+    for (chunks) |chunk| {
         total_input += chunk.len;
-        
-        const compressed = if (i == chunks.len - 1)
-            try compressor.finish(chunk) // Last chunk
-        else
-            try compressor.compress(chunk);
-        
-        defer allocator.free(compressed);
-        total_output += compressed.len;
-        
-        std.debug.print("  Chunk {d}: {d} -> {d} bytes\n", .{ i + 1, chunk.len, compressed.len });
+        try compressor.write(chunk);
     }
     
-    const ratio = @as(f64, @floatFromInt(total_output)) / @as(f64, @floatFromInt(total_input)) * 100;
-    std.debug.print("  Total: {d} -> {d} bytes ({d:.1}%)\n", .{ total_input, total_output, ratio });
+    const compressed = try compressor.finish();
+    defer allocator.free(compressed);
+    total_output = compressed.len;
+    
+    std.debug.print("  Total: {d} -> {d} bytes ({d:.1}%)\n", .{ total_input, total_output, @as(f64, @floatFromInt(total_output)) / @as(f64, @floatFromInt(total_input)) * 100 });
 }
 ```
 
@@ -57,7 +48,7 @@ pub fn basicStreamDecompression(allocator: std.mem.Allocator) !void {
     defer allocator.free(compressed_data);
     
     // Now decompress it using streaming
-    var decompressor = try archive.StreamDecompressor.init(allocator, .zstd);
+    var decompressor = try archive.stream.DecompressStream.init(allocator);
     defer decompressor.deinit();
     
     std.debug.print("Stream decompression:\n");
@@ -73,23 +64,23 @@ pub fn basicStreamDecompression(allocator: std.mem.Allocator) !void {
         const end = @min(offset + chunk_size, compressed_data.len);
         const chunk = compressed_data[offset..end];
         
-        const decompressed_chunk = if (end == compressed_data.len)
-            try decompressor.finish(chunk) // Last chunk
-        else
-            try decompressor.decompress(chunk);
+        try decompressor.write(chunk);
         
-        defer allocator.free(decompressed_chunk);
-        
-        total_decompressed += decompressed_chunk.len;
+        total_decompressed += chunk.len;
         chunk_count += 1;
         
-        std.debug.print("  Chunk {d}: {d} -> {d} bytes\n", .{ chunk_count, chunk.len, decompressed_chunk.len });
+        std.debug.print("  Chunk {d}: {d} bytes input\n", .{ chunk_count, chunk.len });
         
         offset = end;
     }
     
+    const decompressed = try decompressor.finish();
+    defer allocator.free(decompressed);
+    
+    total_decompressed = decompressed.len;
+    
     std.debug.print("  Total decompressed: {d} bytes\n", .{total_decompressed});
-    std.debug.print("  Integrity: {s}\n", .{if (total_decompressed == original_data.len) "PASS" else "FAIL"});
+    std.debug.print("  Integrity: {s}\n", .{if (decompressed.len == original_data.len) "PASS" else "FAIL"});
 }
 ```
 
@@ -98,7 +89,7 @@ pub fn basicStreamDecompression(allocator: std.mem.Allocator) !void {
 ### Large File Compression
 
 ```zig
-pub fn streamCompressLargeFile(allocator: std.mem.Allocator) !void {
+pub fn streamCompressLargeFile(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create a large test file
     const test_file = "large_test_file.txt";
     const compressed_file = "large_test_file.txt.zst";
@@ -108,7 +99,7 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator) !void {
     const num_lines = 10000;
     
     {
-        const output_file = try std.fs.cwd().createFile(test_file, .{});
+        const output_file = try std.Io.Dir.cwd().createFile(io, test_file, .{});
         defer output_file.close();
         
         var i: usize = 0;
@@ -120,13 +111,13 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator) !void {
     }
     
     // Stream compress the file
-    const input_file = try std.fs.cwd().openFile(test_file, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, test_file, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(compressed_file, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, compressed_file, .{});
     defer output_file.close();
     
-    var compressor = try archive.StreamCompressor.init(allocator, .zstd);
+    var compressor = try archive.stream.CompressStream.init(allocator, .zstd, .default);
     defer compressor.deinit();
     
     var buffer: [64 * 1024]u8 = undefined; // 64KB buffer
@@ -143,18 +134,16 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator) !void {
         total_read += bytes_read;
         chunk_count += 1;
         
-        const compressed_chunk = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read]) // Last chunk
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        defer allocator.free(compressed_chunk);
-        
-        try output_file.writeAll(compressed_chunk);
-        total_written += compressed_chunk.len;
-        
-        if (bytes_read < buffer.len) break; // EOF
+        if (bytes_read < buffer.len) break;
     }
+    
+    const compressed = try compressor.finish();
+    defer allocator.free(compressed);
+    
+    try output_file.writeAll(compressed);
+    total_written = compressed.len;
     
     const end_time = std.time.nanoTimestamp();
     const duration_ms = @as(f64, @floatFromInt(end_time - start_time)) / 1_000_000.0;
@@ -167,15 +156,15 @@ pub fn streamCompressLargeFile(allocator: std.mem.Allocator) !void {
     std.debug.print("  Time: {d:.2}ms ({d:.2} MB/s)\n", .{ duration_ms, throughput_mb });
     
     // Clean up
-    std.fs.cwd().deleteFile(test_file) catch {};
-    std.fs.cwd().deleteFile(compressed_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, test_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, compressed_file) catch {};
 }
 ```
 
 ### Large File Decompression
 
 ```zig
-pub fn streamDecompressLargeFile(allocator: std.mem.Allocator) !void {
+pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create test files
     const original_file = "original_large.txt";
     const compressed_file = "compressed_large.lz4";
@@ -183,25 +172,25 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator) !void {
     
     // Create original file
     const test_content = "Large file decompression test content line.\n" ** 5000;
-    try std.fs.cwd().writeFile(.{ .sub_path = original_file, .data = test_content });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = original_file, .data = test_content });
     
     // Compress it first
-    const original_data = try std.fs.cwd().readFileAlloc(allocator, original_file, 10 * 1024 * 1024);
+    const original_data = try std.Io.Dir.cwd().readFileAlloc(io, original_file, allocator, .limited(10 * 1024 * 1024));
     defer allocator.free(original_data);
     
     const compressed_data = try archive.compress(allocator, original_data, .lz4);
     defer allocator.free(compressed_data);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = compressed_file, .data = compressed_data });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = compressed_file, .data = compressed_data });
     
     // Now stream decompress
-    const input_file = try std.fs.cwd().openFile(compressed_file, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, compressed_file, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(decompressed_file, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, decompressed_file, .{});
     defer output_file.close();
     
-    var decompressor = try archive.StreamDecompressor.init(allocator, .lz4);
+    var decompressor = try archive.stream.DecompressStream.init(allocator);
     defer decompressor.deinit();
     
     var buffer: [32 * 1024]u8 = undefined; // 32KB buffer
@@ -216,24 +205,22 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator) !void {
         
         total_read += bytes_read;
         
-        const decompressed_chunk = if (bytes_read < buffer.len)
-            try decompressor.finish(buffer[0..bytes_read])
-        else
-            try decompressor.decompress(buffer[0..bytes_read]);
-        
-        defer allocator.free(decompressed_chunk);
-        
-        try output_file.writeAll(decompressed_chunk);
-        total_written += decompressed_chunk.len;
+        try decompressor.write(buffer[0..bytes_read]);
         
         if (bytes_read < buffer.len) break;
     }
+    
+    const decompressed = try decompressor.finish();
+    defer allocator.free(decompressed);
+    
+    try output_file.writeAll(decompressed);
+    total_written = decompressed.len;
     
     const end_time = std.time.nanoTimestamp();
     const duration_ms = @as(f64, @floatFromInt(end_time - start_time)) / 1_000_000.0;
     
     // Verify integrity
-    const decompressed_data = try std.fs.cwd().readFileAlloc(allocator, decompressed_file, 10 * 1024 * 1024);
+    const decompressed_data = try std.Io.Dir.cwd().readFileAlloc(io, decompressed_file, allocator, .limited(10 * 1024 * 1024));
     defer allocator.free(decompressed_data);
     
     const integrity_check = std.mem.eql(u8, original_data, decompressed_data);
@@ -245,9 +232,9 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator) !void {
     std.debug.print("  Integrity: {s}\n", .{if (integrity_check) "PASS" else "FAIL"});
     
     // Clean up
-    std.fs.cwd().deleteFile(original_file) catch {};
-    std.fs.cwd().deleteFile(compressed_file) catch {};
-    std.fs.cwd().deleteFile(decompressed_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, original_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, compressed_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, decompressed_file) catch {};
 }
 ```
 
@@ -257,7 +244,7 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn realTimeDataCompression(allocator: std.mem.Allocator) !void {
-    var compressor = try archive.StreamCompressor.init(allocator, .lz4);
+    var compressor = try archive.stream.CompressStream.init(allocator, .lz4, .default);
     defer compressor.deinit();
     
     std.debug.print("Real-time data compression simulation:\n");
@@ -279,21 +266,14 @@ pub fn realTimeDataCompression(allocator: std.mem.Allocator) !void {
         total_input += sensor_data.len;
         
         // Compress packet
-        const compressed = try compressor.compress(sensor_data);
-        defer allocator.free(compressed);
-        
-        total_output += compressed.len;
-        
-        if (packet_id % 10 == 0) {
-            std.debug.print("  Packet {d}: {d} -> {d} bytes\n", .{ packet_id, sensor_data.len, compressed.len });
-        }
+        try compressor.write(sensor_data);
         
         // Simulate network transmission delay
         std.time.sleep(5 * std.time.ns_per_ms);
     }
     
     // Finish the stream
-    const final_chunk = try compressor.finish("");
+    const final_chunk = try compressor.finish();
     defer allocator.free(final_chunk);
     total_output += final_chunk.len;
     
@@ -307,15 +287,15 @@ pub fn realTimeDataCompression(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub const BufferedStreamProcessor = struct {
-    compressor: archive.StreamCompressor,
+    compressor: archive.stream.CompressStream,
     buffer: std.ArrayList(u8),
     buffer_limit: usize,
     allocator: std.mem.Allocator,
     
     pub fn init(allocator: std.mem.Allocator, algorithm: archive.Algorithm, buffer_limit: usize) !BufferedStreamProcessor {
         return BufferedStreamProcessor{
-            .compressor = try archive.StreamCompressor.init(allocator, algorithm),
-            .buffer = std.ArrayList(u8).init(allocator),
+            .compressor = try archive.stream.CompressStream.init(allocator, algorithm, .default),
+            .buffer = .empty,
             .buffer_limit = buffer_limit,
             .allocator = allocator,
         };
@@ -323,7 +303,7 @@ pub const BufferedStreamProcessor = struct {
     
     pub fn deinit(self: *BufferedStreamProcessor) void {
         self.compressor.deinit();
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
     
     pub fn addData(self: *BufferedStreamProcessor, data: []const u8) !?[]u8 {
@@ -341,13 +321,13 @@ pub const BufferedStreamProcessor = struct {
             return try self.allocator.alloc(u8, 0);
         }
         
-        const compressed = try self.compressor.compress(self.buffer.items);
+        try self.compressor.write(self.buffer.items);
         self.buffer.clearRetainingCapacity();
-        return compressed;
+        return try self.compressor.finish();
     }
     
     pub fn finish(self: *BufferedStreamProcessor) ![]u8 {
-        const compressed = try self.compressor.finish(self.buffer.items);
+        const compressed = try self.compressor.finish();
         self.buffer.clearRetainingCapacity();
         return compressed;
     }
@@ -409,7 +389,7 @@ pub fn pipelineStreamProcessing(allocator: std.mem.Allocator) !void {
         "Raw sensor reading: temperature=26.4",
     };
     
-    var compressor = try archive.StreamCompressor.init(allocator, .lz4);
+    var compressor = try archive.stream.CompressStream.init(allocator, .lz4, .default);
     defer compressor.deinit();
     
     std.debug.print("Pipeline stream processing:\n");
@@ -431,31 +411,24 @@ pub fn pipelineStreamProcessing(allocator: std.mem.Allocator) !void {
         total_transformed += transformed.len;
         
         // Stage 3: Compress
-        const compressed = if (i == input_data.len - 1)
-            try compressor.finish(transformed)
-        else
-            try compressor.compress(transformed);
-        defer allocator.free(compressed);
-        
-        total_compressed += compressed.len;
+        try compressor.write(transformed);
+        total_compressed += transformed.len;
         
         // Stage 4: Output (simulate sending)
-        std.debug.print("  Pipeline {d}: {d} -> {d} -> {d} bytes\n", 
-                       .{ i + 1, raw_data.len, transformed.len, compressed.len });
+        std.debug.print("  Pipeline {d}: {d} -> {d} bytes\n", 
+                       .{ i + 1, raw_data.len, transformed.len });
     }
     
     const transform_ratio = @as(f64, @floatFromInt(total_transformed)) / @as(f64, @floatFromInt(total_input)) * 100;
-    const compress_ratio = @as(f64, @floatFromInt(total_compressed)) / @as(f64, @floatFromInt(total_transformed)) * 100;
     
     std.debug.print("  Transform: {d} -> {d} bytes ({d:.1}%)\n", .{ total_input, total_transformed, transform_ratio });
-    std.debug.print("  Compress: {d} -> {d} bytes ({d:.1}%)\n", .{ total_transformed, total_compressed, compress_ratio });
 }
 ```
 
 ### Memory-Efficient Stream Processing
 
 ```zig
-pub fn memoryEfficientStreaming(allocator: std.mem.Allocator) !void {
+pub fn memoryEfficientStreaming(allocator: std.mem.Allocator, io: std.Io) !void {
     // Use arena allocator for temporary allocations
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -467,16 +440,16 @@ pub fn memoryEfficientStreaming(allocator: std.mem.Allocator) !void {
     
     // Generate test content
     const content = "Memory efficient streaming test content line.\n" ** 2000;
-    try std.fs.cwd().writeFile(.{ .sub_path = input_file, .data = content });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = input_file, .data = content });
     
     // Process with minimal memory usage
-    const input = try std.fs.cwd().openFile(input_file, .{});
+    const input = try std.Io.Dir.cwd().openFile(io, input_file, .{});
     defer input.close();
     
-    const output = try std.fs.cwd().createFile(output_file, .{});
+    const output = try std.Io.Dir.cwd().createFile(io, output_file, .{});
     defer output.close();
     
-    var compressor = try archive.StreamCompressor.init(arena_allocator, .lz4);
+    var compressor = try archive.stream.CompressStream.init(arena_allocator, .lz4, .default);
     defer compressor.deinit();
     
     // Use small buffer to minimize memory usage
@@ -498,24 +471,20 @@ pub fn memoryEfficientStreaming(allocator: std.mem.Allocator) !void {
         total_processed += bytes_read;
         chunk_count += 1;
         
-        const compressed = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read])
-        else
-            try compressor.compress(buffer[0..bytes_read]);
+        try compressor.write(buffer[0..bytes_read]);
         
-        try output.writeAll(compressed);
-        
-        // Memory is automatically freed by arena allocator
-        // No need for explicit free() calls
-        
-        if (bytes_read < buffer.len) break;
+        if (bytes_read < buffer.len) {
+            const compressed = try compressor.finish();
+            try output.writeAll(compressed);
+            break;
+        }
     }
     
     const end_time = std.time.nanoTimestamp();
     const duration_ms = @as(f64, @floatFromInt(end_time - start_time)) / 1_000_000.0;
     
     // Get output file size
-    const output_stat = try std.fs.cwd().statFile(output_file);
+    const output_stat = try std.Io.Dir.cwd().statFile(io, output_file, .{});
     const ratio = @as(f64, @floatFromInt(output_stat.size)) / @as(f64, @floatFromInt(total_processed)) * 100;
     
     std.debug.print("  Processed: {d} bytes in {d} chunks\n", .{ total_processed, chunk_count });
@@ -524,8 +493,8 @@ pub fn memoryEfficientStreaming(allocator: std.mem.Allocator) !void {
     std.debug.print("  Memory usage: Minimal (arena-based)\n");
     
     // Clean up
-    std.fs.cwd().deleteFile(input_file) catch {};
-    std.fs.cwd().deleteFile(output_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, input_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, output_file) catch {};
 }
 ```
 
@@ -557,7 +526,7 @@ pub fn robustStreamProcessing(allocator: std.mem.Allocator) !void {
 }
 
 fn processStreamRobustly(allocator: std.mem.Allocator, data: []const u8) !void {
-    var compressor = archive.StreamCompressor.init(allocator, .gzip) catch |err| switch (err) {
+    var compressor = archive.stream.CompressStream.init(allocator, .gzip, .default) catch |err| switch (err) {
         error.OutOfMemory => {
             std.debug.print("Failed to initialize compressor (OOM)");
             return err;
@@ -567,34 +536,20 @@ fn processStreamRobustly(allocator: std.mem.Allocator, data: []const u8) !void {
     defer compressor.deinit();
     
     // Process data
-    const compressed = compressor.compress(data) catch |err| switch (err) {
-        error.OutOfMemory => {
-            std.debug.print("Compression failed (OOM)");
-            return err;
-        },
-        error.InvalidData => {
-            std.debug.print("Invalid input data");
-            return err;
-        },
-        else => return err,
-    };
-    defer allocator.free(compressed);
+    try compressor.write(data);
     
     // Finish stream
-    const final_chunk = compressor.finish("") catch |err| switch (err) {
+    const compressed = compressor.finish() catch |err| switch (err) {
         error.StreamNotFinalized => {
             std.debug.print("Stream finalization failed");
             return err;
         },
         else => return err,
     };
-    defer allocator.free(final_chunk);
+    defer allocator.free(compressed);
     
     // Verify by decompressing
-    const total_compressed = try std.mem.concat(allocator, u8, &[_][]const u8{ compressed, final_chunk });
-    defer allocator.free(total_compressed);
-    
-    const decompressed = archive.decompress(allocator, total_compressed, .gzip) catch |err| switch (err) {
+    const decompressed = archive.decompress(allocator, compressed, .gzip) catch |err| switch (err) {
         error.CorruptedStream => {
             std.debug.print("Verification failed (corrupted)");
             return err;
@@ -615,7 +570,7 @@ fn processStreamRobustly(allocator: std.mem.Allocator, data: []const u8) !void {
 ### High-Performance Streaming
 
 ```zig
-pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
+pub fn highPerformanceStreaming(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create large test data
     const test_file = "performance_test.txt";
     const compressed_file = "performance_test.lz4";
@@ -625,7 +580,7 @@ pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
     const num_lines = 50000;
     
     {
-        const file = try std.fs.cwd().createFile(test_file, .{});
+        const file = try std.Io.Dir.cwd().createFile(io, test_file, .{});
         defer file.close();
         
         var i: usize = 0;
@@ -639,13 +594,13 @@ pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
         .withLevel(.fastest)
         .withBufferSize(1024 * 1024); // 1MB buffer
     
-    var compressor = try archive.StreamCompressor.initWithConfig(allocator, config);
+    var compressor = try archive.stream.CompressStream.init(allocator, config.algorithm, config.level);
     defer compressor.deinit();
     
-    const input_file = try std.fs.cwd().openFile(test_file, .{});
+    const input_file = try std.Io.Dir.cwd().openFile(io, test_file, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(compressed_file, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, compressed_file, .{});
     defer output_file.close();
     
     // Pre-allocate large buffer
@@ -664,15 +619,14 @@ pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
         total_bytes += bytes_read;
         chunk_count += 1;
         
-        const compressed = if (bytes_read < buffer.len)
-            try compressor.finish(buffer[0..bytes_read])
-        else
-            try compressor.compress(buffer[0..bytes_read]);
-        
-        defer allocator.free(compressed);
-        try output_file.writeAll(compressed);
+        try compressor.write(buffer[0..bytes_read]);
         
         if (bytes_read < buffer.len) break;
+    }
+    
+    const compressed = try compressor.finish();
+    defer allocator.free(compressed);
+    try output_file.writeAll(compressed);
     }
     
     const end_time = std.time.nanoTimestamp();
@@ -680,7 +634,7 @@ pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
     const throughput_mb = @as(f64, @floatFromInt(total_bytes)) / (1024.0 * 1024.0) / (duration_ms / 1000.0);
     
     // Get compressed file size
-    const compressed_stat = try std.fs.cwd().statFile(compressed_file);
+    const compressed_stat = try std.Io.Dir.cwd().statFile(io, compressed_file, .{});
     const ratio = @as(f64, @floatFromInt(compressed_stat.size)) / @as(f64, @floatFromInt(total_bytes)) * 100;
     
     std.debug.print("High-performance streaming results:\n");
@@ -691,8 +645,8 @@ pub fn highPerformanceStreaming(allocator: std.mem.Allocator) !void {
     std.debug.print("  Buffer size: {d} KB\n", .{config.buffer_size / 1024});
     
     // Clean up
-    std.fs.cwd().deleteFile(test_file) catch {};
-    std.fs.cwd().deleteFile(compressed_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, test_file) catch {};
+    std.Io.Dir.cwd().deleteFile(io, compressed_file) catch {};
 }
 ```
 
@@ -736,5 +690,4 @@ pub fn completeStreamingExample(allocator: std.mem.Allocator) !void {
 
 - Learn about [File Operations](./file-operations.md) for file-based streaming
 - Explore [Configuration](./configuration.md) for streaming optimization
-- Check out [Auto-Detection](./auto-detection.md) for format detection in streams
 - See [Builder Pattern](./builder.md) for flexible stream configuration

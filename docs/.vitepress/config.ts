@@ -24,7 +24,7 @@ export default defineConfig({
   description: SITE_DESCRIPTION,
   base: "/archive.zig/",
   lastUpdated: true,
-  cleanUrls: true,
+  cleanUrls: false,
   sitemap: {
     hostname: SITE_URL,
   },
@@ -71,6 +71,7 @@ export default defineConfig({
     ["meta", { name: "twitter:image", content: `${SITE_URL}/cover.png` }],
     ["meta", { name: "twitter:creator", content: "@muhammadfiaz_" }],
     // Favicons
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/archive.zig/favicon.svg" }],
     ["link", { rel: "icon", href: "/archive.zig/favicon.ico" }],
     [
       "link",
@@ -161,7 +162,6 @@ gtag('config', '${GA_ID}');`,
       },
     ],
   ],
-  ignoreDeadLinks: [/.*\.zig$/],
   transformPageData(pageData) {
     // Dynamic OG image generation based on page title
     const pageTitle = pageData.title || SITE_NAME;
@@ -245,7 +245,7 @@ gtag('config', '${GA_ID}');`,
         url: SITE_URL,
         logo: {
           "@type": "ImageObject",
-          url: `${SITE_URL}/logo.png`,
+          url: `${SITE_URL}/logo.svg`,
         },
       },
     };
@@ -330,7 +330,7 @@ gtag('config', '${GA_ID}');`,
     ]);
   },
   themeConfig: {
-    logo: "/logo.png",
+    logo: "/logo.svg",
     siteTitle: "Archive.zig",
     nav: [
       { text: "Home", link: "/" },
@@ -365,7 +365,6 @@ gtag('config', '${GA_ID}');`,
           { text: "Algorithms", link: "/guide/algorithms" },
           { text: "Configuration", link: "/guide/configuration" },
           { text: "Builder Pattern", link: "/guide/builder" },
-          { text: "Auto-Detection", link: "/guide/auto-detection" },
         ],
       },
       {
@@ -398,7 +397,6 @@ gtag('config', '${GA_ID}');`,
           { text: "Basic Usage", link: "/examples/basic" },
           { text: "Configuration", link: "/examples/configuration" },
           { text: "Builder Pattern", link: "/examples/builder" },
-          { text: "Auto-Detection", link: "/examples/auto-detection" },
           { text: "File Operations", link: "/examples/file-operations" },
           { text: "Streaming", link: "/examples/streaming" },
         ],

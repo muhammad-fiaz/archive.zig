@@ -5,7 +5,7 @@ const constants = @import("../constants.zig");
 const utils = @import("../utils.zig");
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len + 50) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     try result.append(allocator, constants.LzmaConstants.properties_byte);
@@ -27,17 +27,13 @@ pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.
     return result.toOwnedSlice(allocator);
 }
 
-pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    _ = options;
+pub fn decompress(allocator: std.mem.Allocator, data: []const u8, _: config.Options) ![]u8 {
     if (data.len < 13) return errors.CompressError.InvalidLzmaHeader;
 
-    var stream = std.io.fixedBufferStream(data);
-    var reader = stream.reader();
-
-    _ = try reader.readByte();
-    const dict_size = try reader.readInt(u32, .little);
+    _ = data[0]; // properties byte
+    const dict_size = std.mem.readInt(u32, data[1..5], .little);
     _ = dict_size;
-    const uncompressed_len = try reader.readInt(u64, .little);
+    const uncompressed_len = std.mem.readInt(u64, data[5..13], .little);
 
     if (uncompressed_len > std.math.maxInt(usize)) return errors.CompressError.OutputTooLarge;
 
@@ -46,7 +42,7 @@ pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: confi
     else
         @as(usize, @intCast(uncompressed_len));
 
-    var result = std.ArrayList(u8).initCapacity(allocator, output_size) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     try result.ensureTotalCapacity(allocator, output_size);
@@ -63,7 +59,7 @@ pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: confi
 fn compressLzmaData(allocator: std.mem.Allocator, data: []const u8, level: u8) ![]u8 {
     _ = level;
 
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     const min_match: usize = constants.LzmaConstants.min_match;
@@ -139,7 +135,7 @@ fn compressLzmaData(allocator: std.mem.Allocator, data: []const u8, level: u8) !
 }
 
 fn decompressLzmaData(allocator: std.mem.Allocator, data: []const u8, expected_size: usize) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, expected_size) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     try result.ensureTotalCapacity(allocator, expected_size);

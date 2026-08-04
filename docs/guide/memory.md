@@ -56,11 +56,11 @@ pub fn arenaAllocatorExample(base_allocator: std.mem.Allocator) !void {
 ### Streaming for Large Files
 
 ```zig
-pub fn memoryEfficientFileCompression(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8) !void {
-    const input_file = try std.fs.cwd().openFile(input_path, .{});
+pub fn memoryEfficientFileCompression(allocator: std.mem.Allocator, input_path: []const u8, output_path: []const u8, io: std.Io) !void {
+    const input_file = try std.Io.Dir.cwd().openFile(io, input_path, .{});
     defer input_file.close();
     
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
     // Use small buffer to minimize memory usage
@@ -103,13 +103,13 @@ pub const ReusableCompressor = struct {
     pub fn init(allocator: std.mem.Allocator, algorithm: archive.Algorithm) ReusableCompressor {
         return ReusableCompressor{
             .allocator = allocator,
-            .buffer = std.ArrayList(u8).init(allocator),
+            .buffer = .empty,
             .algorithm = algorithm,
         };
     }
     
     pub fn deinit(self: *ReusableCompressor) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
     
     pub fn compress(self: *ReusableCompressor, data: []const u8) ![]u8 {
@@ -232,7 +232,7 @@ pub const TrackingAllocator = struct {
 };
 
 pub fn memoryTrackingExample() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     
     var tracking = TrackingAllocator.init(gpa.allocator());
@@ -268,8 +268,9 @@ pub fn preallocationExample(allocator: std.mem.Allocator) !void {
     const estimated_size = input.len + (input.len / 10) + 64; // Add 10% + header overhead
     
     // Pre-allocate buffer
-    var buffer = try std.ArrayList(u8).initCapacity(allocator, estimated_size);
-    defer buffer.deinit();
+    var buffer = .empty;
+    try buffer.ensureTotalCapacity(allocator, estimated_size);
+    defer buffer.deinit(allocator);
     
     // Use configuration to control memory usage
     const config = archive.CompressionConfig.init(.gzip)
@@ -293,9 +294,11 @@ pub const CompressionPool = struct {
     buffer_size: usize,
     
     pub fn init(allocator: std.mem.Allocator, pool_size: usize, buffer_size: usize) !CompressionPool {
+        var buffers = .empty;
+        try buffers.ensureTotalCapacity(allocator, pool_size);
         var pool = CompressionPool{
             .allocator = allocator,
-            .buffers = try std.ArrayList([]u8).initCapacity(allocator, pool_size),
+            .buffers = buffers,
             .mutex = std.Thread.Mutex{},
             .buffer_size = buffer_size,
         };
@@ -313,7 +316,7 @@ pub const CompressionPool = struct {
         for (self.buffers.items) |buffer| {
             self.allocator.free(buffer);
         }
-        self.buffers.deinit();
+        self.buffers.deinit(self.allocator);
     }
     
     pub fn getBuffer(self: *CompressionPool) ?[]u8 {
@@ -402,7 +405,7 @@ pub fn safeMemoryOperations(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn memoryLeakDetection() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{
+    var gpa = std.heap.DebugAllocator(.{
         .safety = true, // Enable safety checks
         .never_unmap = true, // Keep memory mapped for leak detection
         .retain_metadata = true, // Keep allocation metadata

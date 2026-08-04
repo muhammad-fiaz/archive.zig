@@ -1,7 +1,43 @@
 const std = @import("std");
 const config = @import("config.zig");
-const errors = @import("errors.zig");
-const constants = @import("constants.zig");
+
+fn dispatchCompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, options: config.Options, data: []const u8) ![]u8 {
+    const algorithms = @import("archive.zig").algorithms;
+    return switch (algorithm) {
+        .none => allocator.dupe(u8, data),
+        .deflate => algorithms.deflate.compress(allocator, data, options),
+        .gzip => algorithms.gzip.compress(allocator, data, options),
+        .zlib => algorithms.zlib.compress(allocator, data, options),
+        .lz4 => algorithms.lz4.compress(allocator, data, options),
+        .lzma => algorithms.lzma.compress(allocator, data, options),
+        .xz => algorithms.xz.compress(allocator, data, options),
+        .tar_gz => algorithms.tar_gz.compress(allocator, data, options),
+        .zip => algorithms.zip.compress(allocator, data, options),
+        .zstd => algorithms.zstd.compress(allocator, data, options),
+        .raw_deflate => algorithms.deflate.compress(allocator, data, options),
+        .lzma2 => algorithms.lzma.compress(allocator, data, options),
+        .brotli => algorithms.brotli.compress(allocator, data, options),
+    };
+}
+
+fn dispatchDecompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, options: config.Options, data: []const u8) ![]u8 {
+    const algorithms = @import("archive.zig").algorithms;
+    return switch (algorithm) {
+        .none => allocator.dupe(u8, data),
+        .deflate => algorithms.deflate.decompress(allocator, data, options),
+        .gzip => algorithms.gzip.decompress(allocator, data, options),
+        .zlib => algorithms.zlib.decompress(allocator, data, options),
+        .lz4 => algorithms.lz4.decompress(allocator, data, options),
+        .lzma => algorithms.lzma.decompress(allocator, data, options),
+        .xz => algorithms.xz.decompress(allocator, data, options),
+        .tar_gz => algorithms.tar_gz.decompress(allocator, data, options),
+        .zip => algorithms.zip.decompress(allocator, data, options),
+        .zstd => algorithms.zstd.decompress(allocator, data, options),
+        .raw_deflate => algorithms.deflate.decompress(allocator, data, options),
+        .lzma2 => algorithms.lzma.decompress(allocator, data, options),
+        .brotli => algorithms.brotli.decompress(allocator, data, options),
+    };
+}
 
 pub const CompressStream = struct {
     allocator: std.mem.Allocator,
@@ -14,72 +50,46 @@ pub const CompressStream = struct {
             .allocator = allocator,
             .algorithm = algorithm,
             .level = level,
-            .buffer = std.ArrayList(u8){},
+            .buffer = .empty,
         };
     }
 
     pub fn deinit(self: *CompressStream) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
 
     pub fn write(self: *CompressStream, data: []const u8) !void {
-        try self.buffer.appendSlice(data);
+        try self.buffer.appendSlice(self.allocator, data);
     }
 
     pub fn finish(self: *CompressStream) ![]u8 {
-        const algorithms = @import("archive.zig").algorithms;
-
-        return switch (self.algorithm) {
-            .none => self.allocator.dupe(u8, self.buffer.items),
-            .deflate => algorithms.deflate.compress(self.allocator, self.buffer.items, self.level),
-            .gzip => algorithms.gzip.compress(self.allocator, self.buffer.items, self.level),
-            .zlib => algorithms.zlib.compress(self.allocator, self.buffer.items, self.level),
-            .lz4 => algorithms.lz4.compress(self.allocator, self.buffer.items),
-            .lzma => algorithms.lzma.compress(self.allocator, self.buffer.items, self.level),
-            .xz => algorithms.xz.compress(self.allocator, self.buffer.items, self.level),
-            .tar_gz => algorithms.tar_gz.compress(self.allocator, self.buffer.items, self.level),
-            .zip => algorithms.zip.compress(self.allocator, self.buffer.items, self.level),
-            .zstd => algorithms.zstd.compress(self.allocator, self.buffer.items, self.level),
-        };
+        return dispatchCompress(self.allocator, self.algorithm, config.Options{ .level = self.level.toInt() }, self.buffer.items);
     }
 };
 
 pub const DecompressStream = struct {
     allocator: std.mem.Allocator,
+    algorithm: config.Algorithm,
     buffer: std.ArrayList(u8),
 
-    pub fn init(allocator: std.mem.Allocator) DecompressStream {
+    pub fn init(allocator: std.mem.Allocator, algorithm: config.Algorithm) DecompressStream {
         return DecompressStream{
             .allocator = allocator,
-            .buffer = std.ArrayList(u8){},
+            .algorithm = algorithm,
+            .buffer = .empty,
         };
     }
 
     pub fn deinit(self: *DecompressStream) void {
-        self.buffer.deinit();
+        self.buffer.deinit(self.allocator);
     }
 
     pub fn write(self: *DecompressStream, data: []const u8) !void {
-        try self.buffer.appendSlice(data);
+        try self.buffer.appendSlice(self.allocator, data);
     }
 
     pub fn finish(self: *DecompressStream) ![]u8 {
-        const archive = @import("archive.zig");
-        const detected = archive.detectFormat(self.buffer.items);
-        const algorithms = archive.algorithms;
-
-        return switch (detected) {
-            .none => self.allocator.dupe(u8, self.buffer.items),
-            .deflate => algorithms.deflate.decompress(self.allocator, self.buffer.items),
-            .gzip => algorithms.gzip.decompress(self.allocator, self.buffer.items),
-            .zlib => algorithms.zlib.decompress(self.allocator, self.buffer.items),
-            .lz4 => algorithms.lz4.decompress(self.allocator, self.buffer.items),
-            .lzma => algorithms.lzma.decompress(self.allocator, self.buffer.items),
-            .xz => algorithms.xz.decompress(self.allocator, self.buffer.items),
-            .tar_gz => algorithms.tar_gz.decompress(self.allocator, self.buffer.items),
-            .zip => algorithms.zip.decompress(self.allocator, self.buffer.items),
-            .zstd => algorithms.zstd.decompress(self.allocator, self.buffer.items),
-        };
+        return dispatchDecompress(self.allocator, self.algorithm, config.Options{}, self.buffer.items);
     }
 };
 
@@ -110,7 +120,7 @@ test "decompress stream" {
     const compressed = try compress_stream.finish();
     defer testing.allocator.free(compressed);
 
-    var decompress_stream = DecompressStream.init(testing.allocator);
+    var decompress_stream = DecompressStream.init(testing.allocator, .deflate);
     defer decompress_stream.deinit();
 
     try decompress_stream.write(compressed);

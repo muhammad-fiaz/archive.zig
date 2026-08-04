@@ -31,7 +31,7 @@ This project adheres to a code of conduct that we expect all contributors to fol
 
 ### Prerequisites
 
-- **Zig 0.15.0 or later**: Download from [ziglang.org](https://ziglang.org/download/)
+- **Zig 0.16.0 or later**: Download from [ziglang.org](https://ziglang.org/download/)
 - **Git**: For version control
 - **Basic knowledge of compression algorithms** (helpful but not required)
 

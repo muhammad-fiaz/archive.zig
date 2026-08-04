@@ -4,7 +4,7 @@ This guide covers different ways to install and integrate Archive.zig into your 
 
 ## Prerequisites
 
-- **Zig 0.15.0** or later
+- **Zig 0.16.0** or later
 - No external dependencies required
 
 ## Package Manager (Recommended)
@@ -14,7 +14,7 @@ The easiest way to add Archive.zig to your project is using Zig's built-in packa
 ### Stable Release
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.1.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz
 ```
 
 ### Latest Development Version
@@ -37,7 +37,7 @@ Add Archive.zig to your project's `build.zig.zon`:
     .version = "0.1.0",
     .dependencies = .{
         .archive = .{
-            .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.1.tar.gz",
+            .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz",
             .hash = "1220...", // Run zig fetch to get the correct hash
         },
     },
@@ -81,8 +81,9 @@ pub fn build(b: *std.Build) void {
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn main() !void {
-    // Your code here
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    _ = allocator; // Your code here
 }
 ```
 
@@ -94,10 +95,8 @@ Verify your installation by creating a simple test:
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     const input = "Hello, Archive.zig!";
     const compressed = try archive.compress(allocator, input, .gzip);
@@ -110,7 +109,7 @@ pub fn main() !void {
 
 Run with:
 ```bash
-zig build run
+zig build run-all-examples
 ```
 
 ## Build Options
@@ -167,7 +166,7 @@ If you get a hash mismatch error:
 
 If you encounter build errors:
 
-1. Ensure you're using Zig 0.15.0 or later:
+1. Ensure you're using Zig 0.16.0 or later:
    ```bash
    zig version
    ```

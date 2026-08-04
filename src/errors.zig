@@ -1,5 +1,10 @@
 const std = @import("std");
 
+/// Unified error set covering all compression backends.
+///
+/// Every error represents a distinct failure mode that consumers of the
+/// archive library may encounter. Backend-specific errors are mapped into
+/// this set by the respective algorithm modules.
 pub const CompressError = error{
     UnsupportedAlgorithm,
     UnsupportedAlgorithmForDirectory,
@@ -21,6 +26,9 @@ pub const CompressError = error{
     PermissionDenied,
     ExcludedByPattern,
     EmptyInput,
+    ReadFailed,
+    WriteFailed,
+    EndOfStream,
 };
 
 pub fn formatError(err: CompressError) []const u8 {
@@ -45,6 +53,9 @@ pub fn formatError(err: CompressError) []const u8 {
         error.PermissionDenied => "Permission denied",
         error.ExcludedByPattern => "Excluded by pattern",
         error.EmptyInput => "Empty input data",
+        error.ReadFailed => "Read operation failed",
+        error.WriteFailed => "Write operation failed",
+        error.EndOfStream => "Unexpected end of stream",
     };
 }
 

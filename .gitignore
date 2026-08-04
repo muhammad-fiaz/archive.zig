@@ -102,3 +102,7 @@ examples/temp_*
 bench/results/
 bench/*.json
 bench/*.csv
+
+zig-cache/
+zig-out/
+zig-pkg/

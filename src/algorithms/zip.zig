@@ -23,26 +23,24 @@ pub const Eocd = struct {
     comment: []const u8,
     allocator: Allocator,
 
-    pub fn newFromReader(allocator: Allocator, reader: anytype) !Eocd {
+    pub fn newFromReader(allocator: Allocator, reader: *std.Io.Reader) !Eocd {
         var buff: [Constants.ZipConstants.EOCD_SIZE_NOV - Constants.ZipConstants.SIGNATURE_LENGTH]u8 = undefined;
-        try reader.readNoEof(&buff);
-        // Note: bitCast/pointerCast logic simplified for safety/portability
-        var stream = std.io.fixedBufferStream(&buff);
-        var r = stream.reader();
+        try reader.readSliceAll(&buff);
+        var r: std.Io.Reader = .fixed(&buff);
         const base = EocdBase{
-            .disk_number = try r.readInt(u16, .little),
-            .cd_start_disk = try r.readInt(u16, .little),
-            .cd_entries_disk = try r.readInt(u16, .little),
-            .total_cd_entries = try r.readInt(u16, .little),
-            .cd_size = try r.readInt(u32, .little),
-            .cd_offset = try r.readInt(u32, .little),
-            .comment_len = try r.readInt(u16, .little),
+            .disk_number = try r.takeInt(u16, .little),
+            .cd_start_disk = try r.takeInt(u16, .little),
+            .cd_entries_disk = try r.takeInt(u16, .little),
+            .total_cd_entries = try r.takeInt(u16, .little),
+            .cd_size = try r.takeInt(u32, .little),
+            .cd_offset = try r.takeInt(u32, .little),
+            .comment_len = try r.takeInt(u16, .little),
         };
 
         const comment = try allocator.alloc(u8, base.comment_len);
         errdefer allocator.free(comment);
         if (base.comment_len != 0)
-            try reader.readNoEof(comment);
+            try reader.readSliceAll(comment);
 
         return Eocd{
             .base = base,
@@ -82,40 +80,39 @@ pub const Cdfh = struct {
     comment: []const u8,
     allocator: Allocator,
 
-    pub fn newFromReader(allocator: Allocator, reader: anytype) !Cdfh {
+    pub fn newFromReader(allocator: Allocator, reader: *std.Io.Reader) !Cdfh {
         var buff: [Constants.ZipConstants.CDHF_SIZE_NOV - Constants.ZipConstants.SIGNATURE_LENGTH]u8 = undefined;
-        try reader.readNoEof(&buff);
-        var stream = std.io.fixedBufferStream(&buff);
-        var r = stream.reader();
+        try reader.readSliceAll(&buff);
+        var r: std.Io.Reader = .fixed(&buff);
         const base = CdfhBase{
-            .made_by_ver = try r.readInt(u16, .little),
-            .extract_ver = try r.readInt(u16, .little),
-            .gp_flag = try r.readInt(u16, .little),
-            .compression = try r.readInt(u16, .little),
-            .mod_time = try r.readInt(u16, .little),
-            .mod_date = try r.readInt(u16, .little),
-            .crc32 = try r.readInt(u32, .little),
-            .comp_size = try r.readInt(u32, .little),
-            .uncomp_size = try r.readInt(u32, .little),
-            .name_len = try r.readInt(u16, .little),
-            .extra_len = try r.readInt(u16, .little),
-            .comment_len = try r.readInt(u16, .little),
-            .start_disk = try r.readInt(u16, .little),
-            .int_attrs = try r.readInt(u16, .little),
-            .ext_attrs = try r.readInt(u32, .little),
-            .lfh_offset = try r.readInt(u32, .little),
+            .made_by_ver = try r.takeInt(u16, .little),
+            .extract_ver = try r.takeInt(u16, .little),
+            .gp_flag = try r.takeInt(u16, .little),
+            .compression = try r.takeInt(u16, .little),
+            .mod_time = try r.takeInt(u16, .little),
+            .mod_date = try r.takeInt(u16, .little),
+            .crc32 = try r.takeInt(u32, .little),
+            .comp_size = try r.takeInt(u32, .little),
+            .uncomp_size = try r.takeInt(u32, .little),
+            .name_len = try r.takeInt(u16, .little),
+            .extra_len = try r.takeInt(u16, .little),
+            .comment_len = try r.takeInt(u16, .little),
+            .start_disk = try r.takeInt(u16, .little),
+            .int_attrs = try r.takeInt(u16, .little),
+            .ext_attrs = try r.takeInt(u32, .little),
+            .lfh_offset = try r.takeInt(u32, .little),
         };
 
         const name = try allocator.alloc(u8, base.name_len);
         errdefer allocator.free(name);
         const extra = try allocator.alloc(u8, base.extra_len);
-        errdefer allocator.free(extra); // fix leak if comment fails
+        errdefer allocator.free(extra);
         const comment = try allocator.alloc(u8, base.comment_len);
         errdefer allocator.free(comment);
 
-        try reader.readNoEof(name);
-        try reader.readNoEof(extra);
-        try reader.readNoEof(comment);
+        try reader.readSliceAll(name);
+        try reader.readSliceAll(extra);
+        try reader.readSliceAll(comment);
 
         return Cdfh{ .base = base, .name = name, .extra = extra, .comment = comment, .allocator = allocator };
     }
@@ -146,22 +143,21 @@ pub const Lfh = struct {
     extra: []const u8,
     allocator: Allocator,
 
-    pub fn newFromReader(allocator: Allocator, reader: anytype) !Lfh {
+    pub fn newFromReader(allocator: Allocator, reader: *std.Io.Reader) !Lfh {
         var buff: [Constants.ZipConstants.LFH_SIZE_NOV - Constants.ZipConstants.SIGNATURE_LENGTH]u8 = undefined;
-        try reader.readNoEof(&buff);
-        var stream = std.io.fixedBufferStream(&buff);
-        var r = stream.reader();
+        try reader.readSliceAll(&buff);
+        var r: std.Io.Reader = .fixed(&buff);
         const base = LfhBase{
-            .extract_ver = try r.readInt(u16, .little),
-            .gp_flag = try r.readInt(u16, .little),
-            .compression = try r.readInt(u16, .little),
-            .mod_time = try r.readInt(u16, .little),
-            .mod_date = try r.readInt(u16, .little),
-            .crc32 = try r.readInt(u32, .little),
-            .comp_size = try r.readInt(u32, .little),
-            .uncomp_size = try r.readInt(u32, .little),
-            .name_len = try r.readInt(u16, .little),
-            .extra_len = try r.readInt(u16, .little),
+            .extract_ver = try r.takeInt(u16, .little),
+            .gp_flag = try r.takeInt(u16, .little),
+            .compression = try r.takeInt(u16, .little),
+            .mod_time = try r.takeInt(u16, .little),
+            .mod_date = try r.takeInt(u16, .little),
+            .crc32 = try r.takeInt(u32, .little),
+            .comp_size = try r.takeInt(u32, .little),
+            .uncomp_size = try r.takeInt(u32, .little),
+            .name_len = try r.takeInt(u16, .little),
+            .extra_len = try r.takeInt(u16, .little),
         };
 
         const name = try allocator.alloc(u8, base.name_len);
@@ -169,8 +165,8 @@ pub const Lfh = struct {
         const extra = try allocator.alloc(u8, base.extra_len);
         errdefer allocator.free(extra);
 
-        try reader.readNoEof(name);
-        try reader.readNoEof(extra);
+        try reader.readSliceAll(name);
+        try reader.readSliceAll(extra);
 
         return Lfh{ .base = base, .name = name, .extra = extra, .allocator = allocator };
     }
@@ -181,49 +177,42 @@ pub const Lfh = struct {
     }
 };
 
-// --- Zip Archive Logic ---
-
 pub const ZipArchive = struct {
-    // We use a seekable stream source. For memory buffer, it's FixedBufferStream.
     data: []const u8,
     allocator: Allocator,
     eocd: Eocd,
     entries: std.ArrayList(ZipEntry),
 
     pub fn init(allocator: Allocator, data: []const u8) !ZipArchive {
-        var fbs = std.io.fixedBufferStream(data);
-        const reader = fbs.reader();
+        var reader: std.Io.Reader = .fixed(data);
 
-        // Find EOCD
         const eocd_offset = try findEocd(data);
-        try fbs.seekTo(eocd_offset + 4);
-        const eocd = try Eocd.newFromReader(allocator, reader);
+        reader.seek = eocd_offset + 4;
+        const eocd = try Eocd.newFromReader(allocator, &reader);
         errdefer eocd.deinit();
 
-        var entries = std.ArrayList(ZipEntry).initCapacity(allocator, eocd.base.total_cd_entries) catch return error.OutOfMemory;
+        var entries: std.ArrayList(ZipEntry) = .empty;
         errdefer entries.deinit(allocator);
 
-        try fbs.seekTo(eocd.base.cd_offset);
+        reader.seek = eocd.base.cd_offset;
         var offset = eocd.base.cd_offset;
 
         for (0..eocd.base.total_cd_entries) |_| {
             var sig_buf: [4]u8 = undefined;
-            try reader.readNoEof(&sig_buf);
+            try reader.readSliceAll(&sig_buf);
             const sig = std.mem.readInt(u32, &sig_buf, .little);
             if (sig != Constants.ZipConstants.CDFH_SIGNATURE) return error.InvalidZipArchive;
 
-            const cdfh = try Cdfh.newFromReader(allocator, reader);
+            const cdfh = try Cdfh.newFromReader(allocator, &reader);
             defer cdfh.deinit();
 
-            // Store current position to restore later
-            const next_cd_pos = fbs.pos;
+            const next_cd_pos = reader.seek;
 
-            // Read LFH to get extra fields (optional but good practice)
-            try fbs.seekTo(cdfh.base.lfh_offset);
-            try reader.readNoEof(&sig_buf);
+            reader.seek = cdfh.base.lfh_offset;
+            try reader.readSliceAll(&sig_buf);
             if (std.mem.readInt(u32, &sig_buf, .little) != Constants.ZipConstants.LFH_SIGNATURE) return error.InvalidZipArchive;
 
-            const lfh = try Lfh.newFromReader(allocator, reader);
+            const lfh = try Lfh.newFromReader(allocator, &reader);
             defer lfh.deinit();
 
             const entry = try ZipEntry.init(allocator, cdfh, lfh, offset);
@@ -231,8 +220,7 @@ pub const ZipArchive = struct {
 
             offset += Constants.ZipConstants.CDHF_SIZE_NOV + cdfh.base.name_len + cdfh.base.extra_len + cdfh.base.comment_len;
 
-            // Restore position for next CD entry
-            try fbs.seekTo(next_cd_pos);
+            reader.seek = next_cd_pos;
         }
 
         return ZipArchive{
@@ -260,7 +248,6 @@ fn findEocd(data: []const u8) !u64 {
     const search_len = @min(data.len, max_comment + min_eocd_size);
     const start_search = data.len - search_len;
 
-    // Search backwards
     var i: usize = data.len - min_eocd_size;
     while (i >= start_search) : (i -= 1) {
         if (std.mem.readInt(u32, data[i..][0..4], .little) == Constants.ZipConstants.EOCD_SIGNATURE) {
@@ -284,12 +271,11 @@ pub const ZipEntry = struct {
     uncomp_size: u32,
     crc32: u32,
     lfh_offset: u32,
-    data_offset: u32, // Offset to actual data after LFH
+    data_offset: u32,
     allocator: Allocator,
 
     pub fn init(allocator: Allocator, cd: Cdfh, lfh: Lfh, offset: u32) !ZipEntry {
         _ = offset;
-        // Calculate data offset: lfh_offset + LFH_SIZE_NOV + name_len + extra_len
         const data_offset = cd.base.lfh_offset + Constants.ZipConstants.LFH_SIZE_NOV + lfh.base.name_len + lfh.base.extra_len;
 
         return ZipEntry{
@@ -318,9 +304,6 @@ pub const ZipEntry = struct {
                 return allocator.dupe(u8, comp_data);
             },
             .Deflate => {
-                // Here we use deflate.decompress (which effectively is stored block in my stub,
-                // but should be real deflate. But std.compress.flate is broken in this env?
-                // If I use the same function as before, it works for MY compressed files.)
                 return deflate.decompress(allocator, comp_data, .{});
             },
             else => return error.UnsupportedCompressionMethod,
@@ -328,17 +311,11 @@ pub const ZipEntry = struct {
     }
 };
 
-// --- Existing Compression Implementation ---
-
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    // For simplicity, just use deflate compression directly
-    // In a real implementation, this would create a proper ZIP archive
     return deflate.compress(allocator, data, options);
 }
 
 pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    // For simplicity, just use deflate decompression directly
-    // In a real implementation, this would parse the ZIP archive
     return deflate.decompress(allocator, data, options);
 }
 

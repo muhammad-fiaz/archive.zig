@@ -10,10 +10,8 @@ The most basic usage - compress and decompress data:
 const std = @import("std");
 const archive = @import("archive");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     const input = "Hello, Archive.zig!";
     
@@ -45,6 +43,7 @@ pub fn compareAlgorithms(allocator: std.mem.Allocator) !void {
         .{ .algo = .deflate, .name = "deflate" },
         .{ .algo = .zstd, .name = "zstd" },
         .{ .algo = .lz4, .name = "lz4" },
+        .{ .algo = .brotli, .name = "brotli" },
     };
     
     std.debug.print("Original size: {d} bytes\n", .{input.len});

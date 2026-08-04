@@ -6,7 +6,7 @@ const utils = @import("../utils.zig");
 const lzma = @import("lzma.zig");
 
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, data.len + 100) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     try result.appendSlice(allocator, &constants.Magic.xz);
@@ -72,34 +72,29 @@ pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.
     return result.toOwnedSlice(allocator);
 }
 
-pub fn decompress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
-    _ = options;
+pub fn decompress(allocator: std.mem.Allocator, data: []const u8, _: config.Options) ![]u8 {
     if (data.len < 12) return errors.CompressError.InvalidData;
 
-    var stream = std.io.fixedBufferStream(data);
-    var reader = stream.reader();
-
     const magic = data[0..6];
-    try stream.seekBy(6);
-
     if (!std.mem.eql(u8, magic, &constants.Magic.xz)) {
         return errors.CompressError.InvalidMagic;
     }
 
-    try stream.seekBy(6);
+    var pos: usize = 6 + 6; // skip magic + flags
 
-    const header_size_encoded = try reader.readByte();
+    const header_size_encoded = data[pos];
+    pos += 1;
     if (header_size_encoded == 0) return errors.CompressError.InvalidData;
 
     const header_size = (@as(usize, header_size_encoded) + 1) * 4;
-    try stream.seekBy(@intCast(header_size - 1));
+    pos += header_size - 1;
 
-    const lzma2_data = data[stream.pos .. data.len - 12];
+    const lzma2_data = data[pos .. data.len - 12];
     return decompressLzma2(allocator, lzma2_data);
 }
 
 fn compressLzma2(allocator: std.mem.Allocator, data: []const u8, level: u8) ![]u8 {
-    var result = std.ArrayList(u8).initCapacity(allocator, 1024) catch return error.OutOfMemory;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
     if (data.len == 0) {
@@ -115,7 +110,7 @@ fn compressLzma2(allocator: std.mem.Allocator, data: []const u8, level: u8) ![]u
         const chunk = data[pos..end];
         const uncompressed_size = chunk.len;
 
-        var lzma_data = std.ArrayList(u8).initCapacity(allocator, 1024) catch return error.OutOfMemory;
+        var lzma_data: std.ArrayList(u8) = .empty;
         defer lzma_data.deinit(allocator);
 
         const compressed_chunk = try lzma.compress(allocator, chunk, .{ .level = level });
@@ -142,25 +137,27 @@ fn compressLzma2(allocator: std.mem.Allocator, data: []const u8, level: u8) ![]u
 fn decompressLzma2(allocator: std.mem.Allocator, data: []const u8) ![]u8 {
     if (data.len < 1) return errors.CompressError.InvalidData;
 
-    var stream = std.io.fixedBufferStream(data);
-    var reader = stream.reader();
-    var result = std.ArrayList(u8).initCapacity(allocator, 1024) catch return error.OutOfMemory;
+    var pos: usize = 0;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
 
-    while (stream.pos < data.len) {
-        const control = try reader.readByte();
+    while (pos < data.len) {
+        const control = data[pos];
+        pos += 1;
         if (control == 0x00) break;
 
         if (control == 0x02) {
-            const unpacked_size = @as(usize, try reader.readInt(u16, .little)) + 1;
-            const packed_size = @as(usize, try reader.readInt(u16, .little)) + 1;
+            if (pos + 4 > data.len) return errors.CompressError.InvalidData;
+            const unpacked_size = @as(usize, std.mem.readInt(u16, data[pos..][0..2], .little)) + 1;
+            const packed_size = @as(usize, std.mem.readInt(u16, data[pos + 2 ..][0..2], .little)) + 1;
+            pos += 4;
 
-            if (stream.pos + packed_size > data.len) return errors.CompressError.InvalidData;
+            if (pos + packed_size > data.len) return errors.CompressError.InvalidData;
 
-            const chunk_data = data[stream.pos .. stream.pos + packed_size];
-            try stream.seekBy(@intCast(packed_size));
+            const chunk_data = data[pos .. pos + packed_size];
+            pos += packed_size;
 
-            var lzma_header = std.ArrayList(u8).initCapacity(allocator, 1024) catch return error.OutOfMemory;
+            var lzma_header: std.ArrayList(u8) = .empty;
             defer lzma_header.deinit(allocator);
 
             try lzma_header.append(allocator, constants.LzmaConstants.properties_byte);
