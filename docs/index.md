@@ -6,7 +6,7 @@ hero:
   text: "All in One archive/compression library for Zig."
   tagline: "Comprehensive compression and archive support for Zig with multiple algorithms and streaming capabilities"
   image:
-    src: /logo.png
+    src: /logo.svg
     alt: Archive.zig
   actions:
     - theme: brand
