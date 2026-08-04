@@ -93,54 +93,6 @@ pub const Archive = struct {
             .brotli => algorithms.brotli.decompress(self.allocator, data, options),
         };
     }
-
-    pub fn compressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void {
-        const file = try std.fs.cwd().openFile(input_path, .{});
-        defer file.close();
-
-        const content = try file.readToEndAlloc(self.allocator, std.math.maxInt(usize));
-        defer self.allocator.free(content);
-
-        const compressed = try self.compress(content);
-        defer self.allocator.free(compressed);
-
-        const out_path = output_path orelse blk: {
-            break :blk try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ input_path, self.cfg.algorithm.extension() });
-        };
-        defer if (output_path == null) self.allocator.free(out_path);
-
-        const out_file = try std.fs.cwd().createFile(out_path, .{});
-        defer out_file.close();
-        try out_file.writeAll(compressed);
-    }
-
-    pub fn decompressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void {
-        const file = try std.fs.cwd().openFile(input_path, .{});
-        defer file.close();
-
-        const content = try file.readToEndAlloc(self.allocator, std.math.maxInt(usize));
-        defer self.allocator.free(content);
-
-        const decompressed = try self.decompress(content);
-        defer self.allocator.free(decompressed);
-
-        const out_path = output_path orelse blk: {
-            if (std.mem.endsWith(u8, input_path, ".gz")) {
-                break :blk input_path[0 .. input_path.len - 3];
-            } else if (std.mem.endsWith(u8, input_path, ".zst")) {
-                break :blk input_path[0 .. input_path.len - 4];
-            } else {
-                break :blk try std.fmt.allocPrint(self.allocator, "{s}.decompressed", .{input_path});
-            }
-        };
-        defer if (output_path == null and !std.mem.endsWith(u8, input_path, ".gz") and !std.mem.endsWith(u8, input_path, ".zst")) {
-            self.allocator.free(out_path);
-        };
-
-        const out_file = try std.fs.cwd().createFile(out_path, .{});
-        defer out_file.close();
-        try out_file.writeAll(decompressed);
-    }
 };
 
 pub fn detectFormat(data: []const u8) Algorithm {

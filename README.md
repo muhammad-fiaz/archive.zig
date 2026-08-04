@@ -308,31 +308,37 @@ pub fn autoDetection(allocator: std.mem.Allocator) !void {
 
 ### File Operations
 
+File I/O uses `std.Io.Dir.cwd()` with the `io` handle from `std.process.Init`:
+
 ```zig
-pub fn fileOperations(allocator: std.mem.Allocator) !void {
-    const test_data = "This is test data for file operations.";
+pub fn fileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
+    const input = "This is test data for file compression.";
     
-    // Write test file
-    try std.fs.cwd().writeFile(.{ .sub_path = "test.txt", .data = test_data });
+    // Read file
+    const file_data = try std.Io.Dir.cwd().readFileAlloc(io, "input.txt", allocator, .limited(10 * 1024 * 1024));
+    defer allocator.free(file_data);
     
-    // Compress to file
-    const compressed = try archive.compress(allocator, test_data, .gzip);
+    // Compress
+    const compressed = try archive.compress(allocator, file_data, .zstd);
     defer allocator.free(compressed);
     
-    try std.fs.cwd().writeFile(.{ .sub_path = "test.gz", .data = compressed });
+    // Write compressed file
+    const out_file = try std.Io.Dir.cwd().createFile(io, "output.zst", .{});
+    defer out_file.close();
+    try out_file.writeAll(compressed);
     
-    // Read and decompress
-    const read_compressed = try std.fs.cwd().readFileAlloc(allocator, "test.gz", 1024 * 1024);
-    defer allocator.free(read_compressed);
+    // Read compressed file back
+    const read_data = try std.Io.Dir.cwd().readFileAlloc(io, "output.zst", allocator, .limited(10 * 1024 * 1024));
+    defer allocator.free(read_data);
     
-    const decompressed = try archive.decompress(allocator, read_compressed, .gzip);
+    // Auto-detect and decompress
+    const decompressed = try archive.autoDecompress(allocator, read_data);
     defer allocator.free(decompressed);
     
-    std.debug.print("File operations successful: {}\n", .{std.mem.eql(u8, test_data, decompressed)});
+    std.debug.print("Verified: {}\n", .{std.mem.eql(u8, file_data, decompressed)});
     
     // Cleanup
-    std.fs.cwd().deleteFile("test.txt") catch {};
-    std.fs.cwd().deleteFile("test.gz") catch {};
+    std.fs.cwd().deleteFile("output.zst") catch {};
 }
 ```
 

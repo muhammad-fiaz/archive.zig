@@ -146,8 +146,6 @@ pub const Archive = struct {
     pub fn deinit(self: *Archive) void
     pub fn compress(self: *Archive, data: []const u8) ![]u8
     pub fn decompress(self: *Archive, data: []const u8) ![]u8
-    pub fn compressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void
-    pub fn decompressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void
 };
 ```
 
@@ -182,22 +180,6 @@ pub fn decompress(self: *Archive, data: []const u8) ![]u8
 ```
 
 Decompresses data by auto-detecting the format from the data header.
-
-### `compressFile`
-
-```zig
-pub fn compressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void
-```
-
-Compresses a file. If `output_path` is `null`, the output file is named `{input_path}{extension}`.
-
-### `decompressFile`
-
-```zig
-pub fn decompressFile(self: *Archive, input_path: []const u8, output_path: ?[]const u8) !void
-```
-
-Decompresses a file. If `output_path` is `null`, the extension is stripped (e.g., `.gz`, `.zst`), or `.decompressed` is appended.
 
 ### Usage Example
 
