@@ -690,5 +690,4 @@ pub fn completeStreamingExample(allocator: std.mem.Allocator) !void {
 
 - Learn about [File Operations](./file-operations.md) for file-based streaming
 - Explore [Configuration](./configuration.md) for streaming optimization
-- Check out [Auto-Detection](./auto-detection.md) for format detection in streams
 - See [Builder Pattern](./builder.md) for flexible stream configuration

@@ -159,7 +159,7 @@ pub fn multiChunkExample(allocator: std.mem.Allocator, chunks: []const []const u
 
 1. **Buffer all data before finishing** – `CompressStream` accumulates input, then compresses in one pass
 2. **Call `deinit`** – Always clean up to free the internal buffer
-3. **Algorithm choice** – Pass the correct `Algorithm` to `CompressStream.init`; use `DecompressStream` for auto-detection
+3. **Algorithm choice** – Pass the correct `Algorithm` to both `CompressStream.init` and `DecompressStream.init`
 4. **Level selection** – Use `Level.default` unless you need specific tuning
 
 ## Next Steps

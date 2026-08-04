@@ -35,8 +35,8 @@ pub fn decompressFile(allocator: std.mem.Allocator, input_path: []const u8, outp
     const compressed_data = try std.fs.cwd().readFileAlloc(allocator, input_path, 100 * 1024 * 1024);
     defer allocator.free(compressed_data);
     
-    // Auto-detect and decompress
-    const decompressed = try archive.autoDecompress(allocator, compressed_data);
+    // Decompress
+    const decompressed = try archive.decompress(allocator, compressed_data, .zstd);
     defer allocator.free(decompressed);
     
     // Write decompressed file
@@ -189,23 +189,17 @@ pub fn getFileInfo(allocator: std.mem.Allocator, file_path: []const u8) !void {
     std.debug.print("Size: {d} bytes\n", .{file_stat.size});
     std.debug.print("Modified: {d}\n", .{file_stat.mtime});
     
-    if (archive.detectAlgorithm(file_data)) |algorithm| {
-        std.debug.print("Format: {s} (compressed)\n", .{@tagName(algorithm)});
-        
-        // Try to get uncompressed size
-        const full_data = try std.fs.cwd().readFileAlloc(allocator, file_path, @intCast(file_stat.size));
-        defer allocator.free(full_data);
-        
-        if (archive.decompress(allocator, full_data, algorithm)) |decompressed| {
-            defer allocator.free(decompressed);
-            const ratio = @as(f64, @floatFromInt(full_data.len)) / @as(f64, @floatFromInt(decompressed.len)) * 100;
-            std.debug.print("Uncompressed size: {d} bytes\n", .{decompressed.len});
-            std.debug.print("Compression ratio: {d:.1}%\n", .{ratio});
-        } else |_| {
-            std.debug.print("Could not decompress for size calculation\n", .{});
-        }
-    } else {
-        std.debug.print("Format: Uncompressed or unknown\n", .{});
+    // Decompress to get size
+    const full_data = try std.fs.cwd().readFileAlloc(allocator, file_path, @intCast(file_stat.size));
+    defer allocator.free(full_data);
+    
+    if (archive.decompress(allocator, full_data, .zstd)) |decompressed| {
+        defer allocator.free(decompressed);
+        const ratio = @as(f64, @floatFromInt(full_data.len)) / @as(f64, @floatFromInt(decompressed.len)) * 100;
+        std.debug.print("Uncompressed size: {d} bytes\n", .{decompressed.len});
+        std.debug.print("Compression ratio: {d:.1}%\n", .{ratio});
+    } else |_| {
+        std.debug.print("Could not decompress for size calculation\n", .{});
     }
 }
 ```
@@ -294,14 +288,8 @@ pub fn verifyCompressedFile(allocator: std.mem.Allocator, compressed_path: []con
     const compressed_data = try std.fs.cwd().readFileAlloc(allocator, compressed_path, 100 * 1024 * 1024);
     defer allocator.free(compressed_data);
     
-    // Detect algorithm
-    const algorithm = archive.detectAlgorithm(compressed_data) orelse {
-        std.debug.print("Cannot detect compression format\n", .{});
-        return false;
-    };
-    
     // Decompress
-    const decompressed = archive.decompress(allocator, compressed_data, algorithm) catch |err| {
+    const decompressed = archive.decompress(allocator, compressed_data, .zstd) catch |err| {
         std.debug.print("Decompression failed: {}\n", .{err});
         return false;
     };

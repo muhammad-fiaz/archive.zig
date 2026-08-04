@@ -8,29 +8,6 @@ The main `archive.zig` module provides free functions, an `Archive` struct, and 
 
 ## Free Functions
 
-### `detectFormat`
-
-```zig
-pub fn detectFormat(data: []const u8) Algorithm
-```
-
-Detects the compression algorithm from data magic bytes. Returns `.none` if the format cannot be identified.
-
-**Parameters:**
-- `data`: Input data to inspect
-
-**Returns:** Detected `Algorithm` variant
-
-**Example:**
-```zig
-const algo = archive.detectFormat(compressed_data);
-switch (algo) {
-    .gzip => std.debug.print("Gzip\n", .{}),
-    .zstd => std.debug.print("Zstd\n", .{}),
-    else => {},
-}
-```
-
 ### `compress`
 
 ```zig
@@ -95,84 +72,25 @@ const compressed = try archive.compressWithConfig(allocator, data, cfg);
 defer allocator.free(compressed);
 ```
 
-### `detectAlgorithm`
+### `decompressWithConfig`
 
 ```zig
-pub fn detectAlgorithm(data: []const u8) ?Algorithm
+pub fn decompressWithConfig(allocator: std.mem.Allocator, data: []const u8, cfg: CompressionConfig) ![]u8
 ```
 
-Automatically detects the compression algorithm from data headers. Returns `null` if the algorithm is `.none` or unknown.
-
-**Parameters:**
-- `data`: Compressed data
-
-**Returns:** Detected algorithm or `null`
-
-**Example:**
-```zig
-if (archive.detectAlgorithm(compressed_data)) |algo| {
-    std.debug.print("Detected: {s}\n", .{@tagName(algo)});
-}
-```
-
-### `autoDecompress`
-
-```zig
-pub fn autoDecompress(allocator: std.mem.Allocator, data: []const u8) ![]u8
-```
-
-Automatically detects algorithm and decompresses data.
+Decompresses data with custom configuration.
 
 **Parameters:**
 - `allocator`: Memory allocator
-- `data`: Compressed data
+- `data`: Compressed data to decompress
+- `cfg`: Compression configuration
 
 **Returns:** Decompressed data (caller owns memory)
 
 **Example:**
 ```zig
-const decompressed = try archive.autoDecompress(allocator, compressed_data);
-defer allocator.free(decompressed);
-```
-
-### `detectFromPath`
-
-```zig
-pub fn detectFromPath(path: []const u8) ?Algorithm
-```
-
-Detects algorithm from file extension (e.g., ".gz", ".zst", ".br"). Returns `null` if unrecognized.
-
-**Parameters:**
-- `path`: File path to inspect
-
-**Returns:** Detected algorithm or `null`
-
-**Example:**
-```zig
-if (archive.detectFromPath("data.br")) |algo| {
-    std.debug.print("Detected: {s}\n", .{@tagName(algo)}); // "brotli"
-}
-```
-
-### `autoDecompressFromPath`
-
-```zig
-pub fn autoDecompressFromPath(allocator: std.mem.Allocator, data: []const u8, path: []const u8) ![]u8
-```
-
-Detects algorithm from file extension, falls back to magic bytes if extension is unrecognized.
-
-**Parameters:**
-- `allocator`: Memory allocator
-- `data`: Compressed data
-- `path`: File path (used for extension-based detection)
-
-**Returns:** Decompressed data (caller owns memory)
-
-**Example:**
-```zig
-const decompressed = try archive.autoDecompressFromPath(allocator, data, "archive.br");
+const cfg = archive.CompressionConfig.init(.zstd).withZstdLevel(10);
+const decompressed = try archive.decompressWithConfig(allocator, data, cfg);
 defer allocator.free(decompressed);
 ```
 
@@ -220,7 +138,7 @@ Compresses data using the archive's configured algorithm and settings.
 pub fn decompress(self: *Archive, data: []const u8) ![]u8
 ```
 
-Decompresses data by auto-detecting the format from the data header.
+Decompresses data using the archive's configured algorithm and settings.
 
 ### Usage Example
 
@@ -279,7 +197,7 @@ Creates a new `Compressor` for the given algorithm.
 pub fn withLevel(self: Compressor, level: u8) Compressor
 ```
 
-Sets the compression level (0–9 for most algorithms).
+Sets the compression level (0-9 for most algorithms).
 
 ### `withZstdLevel`
 
@@ -287,7 +205,7 @@ Sets the compression level (0–9 for most algorithms).
 pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
 ```
 
-Sets the Zstandard-specific compression level (1–22).
+Sets the Zstandard-specific compression level (1-22).
 
 ### `withChecksum`
 
@@ -311,7 +229,7 @@ Compresses data using the configured settings.
 pub fn decompress_data(self: Compressor, data: []const u8) ![]u8
 ```
 
-Decompresses data by auto-detecting the format.
+Decompresses data using the configured settings.
 
 ### Compressor Example
 

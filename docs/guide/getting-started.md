@@ -101,5 +101,4 @@ for (algorithms) |algo| {
 - Learn about [Configuration](./configuration.md) options
 - Explore [File Operations](./file-operations.md)
 - Try the [Builder Pattern](./builder.md)
-- Check out [Auto-Detection](./auto-detection.md)
 - See more [Examples](../examples/basic.md)

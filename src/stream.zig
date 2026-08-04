@@ -49,11 +49,13 @@ pub const CompressStream = struct {
 
 pub const DecompressStream = struct {
     allocator: std.mem.Allocator,
+    algorithm: config.Algorithm,
     buffer: std.ArrayList(u8),
 
-    pub fn init(allocator: std.mem.Allocator) DecompressStream {
+    pub fn init(allocator: std.mem.Allocator, algorithm: config.Algorithm) DecompressStream {
         return DecompressStream{
             .allocator = allocator,
+            .algorithm = algorithm,
             .buffer = .empty,
         };
     }
@@ -67,12 +69,10 @@ pub const DecompressStream = struct {
     }
 
     pub fn finish(self: *DecompressStream) ![]u8 {
-        const archive = @import("archive.zig");
-        const detected = archive.detectFormat(self.buffer.items);
-        const algorithms = archive.algorithms;
+        const algorithms = @import("archive.zig").algorithms;
         const options = config.Options{};
 
-        return switch (detected) {
+        return switch (self.algorithm) {
             .none => self.allocator.dupe(u8, self.buffer.items),
             .deflate => algorithms.deflate.decompress(self.allocator, self.buffer.items, options),
             .gzip => algorithms.gzip.decompress(self.allocator, self.buffer.items, options),
@@ -117,7 +117,7 @@ test "decompress stream" {
     const compressed = try compress_stream.finish();
     defer testing.allocator.free(compressed);
 
-    var decompress_stream = DecompressStream.init(testing.allocator);
+    var decompress_stream = DecompressStream.init(testing.allocator, .deflate);
     defer decompress_stream.deinit();
 
     try decompress_stream.write(compressed);

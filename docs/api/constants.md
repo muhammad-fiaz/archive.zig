@@ -219,21 +219,6 @@ pub const ValidationConstants = struct {
 
 ## Usage Examples
 
-### Using Magic Bytes for Detection
-
-```zig
-const archive = @import("archive");
-
-pub fn detectFormat(data: []const u8) void {
-    if (data.len >= 2 and std.mem.eql(u8, data[0..2], &archive.constants.Magic.gzip)) {
-        std.debug.print("Gzip\n", .{});
-    }
-    if (data.len >= 4 and std.mem.eql(u8, data[0..4], &.{ 0x28, 0xB5, 0x2F, 0xFD })) {
-        std.debug.print("Zstd\n", .{});
-    }
-}
-```
-
 ### Using Buffer Size Constants
 
 ```zig

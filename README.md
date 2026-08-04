@@ -28,7 +28,7 @@
   </b>
 </div>
 
-All-in-One archive and compression library for Zig, supporting multiple compression algorithms and archive formats with a clean, intuitive API.
+All-in-One archive and compression library for Zig, supporting multiple compression algorithms and archive formats with a clean, explicit API.
 
 **⭐️ If you love `archive.zig`, make sure to give it a star! ⭐️**
 
@@ -49,7 +49,6 @@ All-in-One archive and compression library for Zig, supporting multiple compress
   - [Basic Compression](#basic-compression)
   - [Configuration Presets](#configuration-presets)
   - [Builder Pattern](#builder-pattern)
-  - [Auto-Detection](#auto-detection)
   - [File Operations](#file-operations)
   - [Streaming Interface](#streaming-interface)
 - [Configuration](#configuration)
@@ -70,17 +69,15 @@ All-in-One archive and compression library for Zig, supporting multiple compress
 | Feature | Description | Documentation |
 |---------|-------------|---------------|
 | **Multiple Algorithms** | Support for 10 compression algorithms: gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, brotli | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/algorithms) |
-| **Simple & Clean API** | User-friendly compression interface (`archive.compress()`, `archive.decompress()`, etc.) | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/getting-started) |
+| **Explicit API** | Always specify the algorithm - no magic, no guessing | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/getting-started) |
 | **Configuration Presets** | Pre-configured settings for fast, balanced, best compression, and production use | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/configuration) |
 | **Builder Pattern** | Fluent API for configuring compression with method chaining | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/builder) |
-| **Auto-Detection** | Automatic algorithm detection from compressed data headers | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/auto-detection) |
 | **Streaming Interface** | Memory-efficient streaming compression and decompression | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/streaming) |
-| **File Operations** | Direct file compression and decompression with proper error handling | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/file-operations) |
+| **Full Customization** | Every algorithm exposes all options: levels, checksums, dictionary, window size, threads | [Docs](https://muhammad-fiaz.github.io/archive.zig/api/config) |
 | **Cross-Platform** | Works on Windows, Linux, macOS, and bare metal targets | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/platforms) |
 | **Thread-Safe** | Safe concurrent compression from multiple threads | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/threading) |
 | **Memory Efficient** | Optimized memory usage with configurable buffer sizes | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/memory) |
 | **Error Handling** | Comprehensive error types and proper error propagation | [Docs](https://muhammad-fiaz.github.io/archive.zig/guide/errors) |
-| **Utility Functions** | Helper functions for size formatting, CRC calculation, and more | [Docs](https://muhammad-fiaz.github.io/archive.zig/api/utils) |
 
 </details>
 
@@ -190,24 +187,20 @@ const archive = @import("archive");
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
 
-    // Basic compression
     const input = "Hello, World! This is a test of the archive library.";
     
-    // Compress with different algorithms
-    const gzip_compressed = try archive.compress(allocator, input, .gzip);
-    defer allocator.free(gzip_compressed);
+    // Compress with explicit algorithm
+    const compressed = try archive.compress(allocator, input, .gzip);
+    defer allocator.free(compressed);
     
-    const zstd_compressed = try archive.compress(allocator, input, .zstd);
-    defer allocator.free(zstd_compressed);
-    
-    // Decompress
-    const decompressed = try archive.decompress(allocator, gzip_compressed, .gzip);
+    // Decompress with same algorithm
+    const decompressed = try archive.decompress(allocator, compressed, .gzip);
     defer allocator.free(decompressed);
     
     std.debug.print("Original: {s}\n", .{input});
     std.debug.print("Decompressed: {s}\n", .{decompressed});
     std.debug.print("Compression ratio: {d:.1}%\n", .{
-        @as(f64, @floatFromInt(gzip_compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100
+        @as(f64, @floatFromInt(compressed.len)) / @as(f64, @floatFromInt(input.len)) * 100
     });
 }
 ```
@@ -286,26 +279,6 @@ pub fn builderPattern(allocator: std.mem.Allocator) !void {
 }
 ```
 
-### Auto-Detection
-
-```zig
-pub fn autoDetection(allocator: std.mem.Allocator) !void {
-    const input = "Auto-detection test data.";
-    
-    // Compress with gzip
-    const compressed = try archive.compress(allocator, input, .gzip);
-    defer allocator.free(compressed);
-    
-    // Auto-detect algorithm and decompress
-    const detected = archive.detectAlgorithm(compressed);
-    const auto_decomp = try archive.autoDecompress(allocator, compressed);
-    defer allocator.free(auto_decomp);
-    
-    std.debug.print("Detected algorithm: {?}\n", .{detected});
-    std.debug.print("Auto-decompressed: {s}\n", .{auto_decomp});
-}
-```
-
 ### File Operations
 
 File I/O uses `std.Io.Dir.cwd()` with the `io` handle from `std.process.Init`:
@@ -318,7 +291,7 @@ pub fn fileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
     const file_data = try std.Io.Dir.cwd().readFileAlloc(io, "input.txt", allocator, .limited(10 * 1024 * 1024));
     defer allocator.free(file_data);
     
-    // Compress
+    // Compress with explicit algorithm
     const compressed = try archive.compress(allocator, file_data, .zstd);
     defer allocator.free(compressed);
     
@@ -331,8 +304,8 @@ pub fn fileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
     const read_data = try std.Io.Dir.cwd().readFileAlloc(io, "output.zst", allocator, .limited(10 * 1024 * 1024));
     defer allocator.free(read_data);
     
-    // Auto-detect and decompress
-    const decompressed = try archive.autoDecompress(allocator, read_data);
+    // Decompress with same algorithm
+    const decompressed = try archive.decompress(allocator, read_data, .zstd);
     defer allocator.free(decompressed);
     
     std.debug.print("Verified: {}\n", .{std.mem.eql(u8, file_data, decompressed)});
@@ -360,8 +333,8 @@ pub fn streamingInterface(allocator: std.mem.Allocator) !void {
     const compressed = try compressor.finish();
     defer allocator.free(compressed);
     
-    // Create streaming decompressor
-    var decompressor = stream.DecompressStream.init(allocator);
+    // Create streaming decompressor (must specify algorithm)
+    var decompressor = stream.DecompressStream.init(allocator, .gzip);
     defer decompressor.deinit();
     
     // Write compressed data and finish
@@ -412,16 +385,13 @@ const lz4_cfg = archive.CompressionConfig.init(.lz4).withLz4Level(9);
 ### Core Functions
 
 ```zig
-// Basic compression/decompression
+// Basic compression/decompression (algorithm is required)
 pub fn compress(allocator: Allocator, data: []const u8, algorithm: Algorithm) ![]u8
 pub fn decompress(allocator: Allocator, data: []const u8, algorithm: Algorithm) ![]u8
 
-// With configuration
+// With full configuration
 pub fn compressWithConfig(allocator: Allocator, data: []const u8, config: CompressionConfig) ![]u8
-
-// Auto-detection
-pub fn detectAlgorithm(data: []const u8) ?Algorithm
-pub fn autoDecompress(allocator: Allocator, data: []const u8) ![]u8
+pub fn decompressWithConfig(allocator: Allocator, data: []const u8, config: CompressionConfig) ![]u8
 ```
 
 ### Algorithms

@@ -51,8 +51,8 @@ pub fn decompressFileExample(allocator: std.mem.Allocator) !void {
     const compressed_data = try std.fs.cwd().readFileAlloc(allocator, "compressed_test.zst", 10 * 1024 * 1024);
     defer allocator.free(compressed_data);
     
-    // Auto-detect and decompress
-    const decompressed = try archive.autoDecompress(allocator, compressed_data);
+    // Decompress
+    const decompressed = try archive.decompress(allocator, compressed_data, .zstd);
     defer allocator.free(decompressed);
     
     // Write decompressed file
@@ -359,7 +359,7 @@ pub fn fileIntegrityExample(allocator: std.mem.Allocator) !void {
             const file_data = try std.fs.cwd().readFileAlloc(alloc, file_path, 10 * 1024 * 1024);
             defer alloc.free(file_data);
             
-            const decompressed = try archive.autoDecompress(alloc, file_data);
+            const decompressed = try archive.decompress(alloc, file_data, .zstd);
             defer alloc.free(decompressed);
             
             return std.mem.eql(u8, expected, decompressed);
@@ -631,5 +631,4 @@ fn processFileRobustly(allocator: std.mem.Allocator, file_path: []const u8) !voi
 
 - Learn about [Streaming](./streaming.md) for memory-efficient file processing
 - Explore [Configuration](./configuration.md) for advanced file filtering
-- Check out [Auto-Detection](./auto-detection.md) for working with unknown formats
 - See [Builder Pattern](./builder.md) for flexible configuration options

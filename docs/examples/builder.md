@@ -609,7 +609,6 @@ pub fn validationExample(allocator: std.mem.Allocator) !void {
 
 ## Next Steps
 
-- Learn about [Auto-Detection](./auto-detection.md) for automatic format detection
 - Explore [File Operations](./file-operations.md) for working with files
 - Check out [Streaming](./streaming.md) for large data processing
 - See [Configuration](./configuration.md) for more configuration examples

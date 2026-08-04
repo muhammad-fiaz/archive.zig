@@ -252,7 +252,6 @@ pub fn mergeConfigs(base: archive.CompressionConfig, override: archive.Compressi
 
 ## Next Steps
 
-- Learn about [Auto-Detection](./auto-detection.md) for automatic format detection
 - Explore [File Operations](./file-operations.md) for working with files
 - Check out [Configuration Examples](../examples/configuration.md)
 - See [Streaming](./streaming.md) for large data processing

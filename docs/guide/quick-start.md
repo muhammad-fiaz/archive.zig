@@ -53,8 +53,8 @@ Let Archive.zig automatically detect the compression format:
 const compressed = try archive.compress(allocator, input, .zstd);
 defer allocator.free(compressed);
 
-// Auto-detect and decompress
-const decompressed = try archive.autoDecompress(allocator, compressed);
+// Decompress
+const decompressed = try archive.decompress(allocator, compressed, .zstd);
 defer allocator.free(decompressed);
 ```
 

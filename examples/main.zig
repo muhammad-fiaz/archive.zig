@@ -9,7 +9,7 @@ pub fn main(init: std.process.Init) !void {
     try basicRoundtrip(allocator);
     try allAlgorithms(allocator);
     try configPresets(allocator);
-    try autoDetection(allocator);
+    try streamingExample(allocator);
 
     std.debug.print("All examples completed successfully!\n", .{});
 }
@@ -73,34 +73,25 @@ fn configPresets(allocator: std.mem.Allocator) !void {
     std.debug.print("   {s:8} {d:6} bytes (custom zstd:15)\n\n", .{ "custom", custom_compressed.len });
 }
 
-fn autoDetection(allocator: std.mem.Allocator) !void {
-    std.debug.print("4. Auto-Detection\n", .{});
+fn streamingExample(allocator: std.mem.Allocator) !void {
+    std.debug.print("4. Streaming Interface\n", .{});
 
-    const input = "Auto-detection test data for all algorithms.";
+    const input = "Streaming compression example data. " ** 50;
 
-    // Magic bytes detection (in-memory data)
-    std.debug.print("   Magic bytes detection:\n", .{});
-    const magic_algos = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .lzma, .xz };
-    for (magic_algos) |algo| {
-        const compressed = try archive.compress(allocator, input, algo);
-        defer allocator.free(compressed);
+    var compress_stream = try archive.stream.CompressStream.init(allocator, .zstd, .default);
+    defer compress_stream.deinit();
 
-        const detected = archive.detectFormat(compressed);
-        const ok = detected == algo;
-        std.debug.print("     {s:8} -> {s:8} {s}\n", .{ @tagName(algo), @tagName(detected), if (ok) "OK" else "FAIL" });
-    }
+    try compress_stream.write(input);
+    const compressed = try compress_stream.finish();
+    defer allocator.free(compressed);
 
-    // File extension detection (all algorithms)
-    std.debug.print("   File extension detection:\n", .{});
-    const ext_algos = [_]archive.Algorithm{ .gzip, .zstd, .lz4, .zlib, .lzma, .xz, .brotli, .zip, .tar_gz, .deflate };
-    for (ext_algos) |algo| {
-        const ext = algo.extension();
-        const path = try std.fmt.allocPrint(allocator, "test{s}", .{ext});
-        defer allocator.free(path);
+    var decompress_stream = archive.stream.DecompressStream.init(allocator, .zstd);
+    defer decompress_stream.deinit();
 
-        const detected = archive.detectFromPath(path);
-        const ok = detected != null and detected.? == algo;
-        std.debug.print("     {s:8} {s:6} -> {s:8} {s}\n", .{ @tagName(algo), ext, if (detected) |d| @tagName(d) else "none", if (ok) "OK" else "FAIL" });
-    }
-    std.debug.print("\n", .{});
+    try decompress_stream.write(compressed);
+    const decompressed = try decompress_stream.finish();
+    defer allocator.free(decompressed);
+
+    const ok = std.mem.eql(u8, input, decompressed);
+    std.debug.print("   zstd streaming: {d} -> {d} -> {d} bytes, verified: {s}\n\n", .{ input.len, compressed.len, decompressed.len, if (ok) "OK" else "FAIL" });
 }
