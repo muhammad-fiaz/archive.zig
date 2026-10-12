@@ -12,7 +12,7 @@ const archive = @import("archive");
 
 pub fn compressFileExample(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create a test file
-    const test_content = "This is test content for file compression example.\n" ** 100;
+    const test_content = "This is test content for file compression example.\n";
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = "test_input.txt", .data = test_content });
     
     // Read and compress file
@@ -41,7 +41,7 @@ pub fn compressFileExample(allocator: std.mem.Allocator, io: std.Io) !void {
 ```zig
 pub fn decompressFileExample(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create test compressed file
-    const original_content = "This is the original content that will be compressed and then decompressed.\n" ** 50;
+    const original_content = "This is the original content that will be compressed and then decompressed.\n";
     const compressed = try archive.compress(allocator, original_content, .zstd);
     defer allocator.free(compressed);
     
@@ -80,10 +80,10 @@ pub fn decompressFileExample(allocator: std.mem.Allocator, io: std.Io) !void {
 pub fn batchCompressionExample(allocator: std.mem.Allocator, io: std.Io) !void {
     // Create test files
     const test_files = [_]struct { name: []const u8, content: []const u8 }{
-        .{ .name = "document1.txt", .content = "Document 1 content with some text data.\n" ** 20 },
-        .{ .name = "document2.txt", .content = "Document 2 content with different text.\n" ** 30 },
-        .{ .name = "data.json", .content = "{\"key\": \"value\", \"array\": [1, 2, 3]}\n" ** 15 },
-        .{ .name = "config.xml", .content = "<config><setting>value</setting></config>\n" ** 25 },
+        .{ .name = "document1.txt", .content = "Document 1 content with some text data.\n" },
+        .{ .name = "document2.txt", .content = "Document 2 content with different text.\n" },
+        .{ .name = "data.json", .content = "{\"key\": \"value\", \"array\": [1, 2, 3]}\n" },
+        .{ .name = "config.xml", .content = "<config><setting>value</setting></config>\n" },
     };
     
     // Create test files
@@ -126,10 +126,10 @@ pub fn directoryCompressionExample(allocator: std.mem.Allocator, io: std.Io) !vo
     try std.Io.Dir.cwd().makeDir(io, "test_dir/subdir");
     
     const test_files = [_]struct { path: []const u8, content: []const u8 }{
-        .{ .path = "test_dir/file1.txt", .content = "Content of file 1\n" ** 10 },
-        .{ .path = "test_dir/file2.txt", .content = "Content of file 2\n" ** 15 },
-        .{ .path = "test_dir/subdir/file3.txt", .content = "Content of file 3\n" ** 8 },
-        .{ .path = "test_dir/subdir/file4.txt", .content = "Content of file 4\n" ** 12 },
+        .{ .path = "test_dir/file1.txt", .content = "Content of file 1\n" },
+        .{ .path = "test_dir/file2.txt", .content = "Content of file 2\n" },
+        .{ .path = "test_dir/subdir/file3.txt", .content = "Content of file 3\n" },
+        .{ .path = "test_dir/subdir/file4.txt", .content = "Content of file 4\n" },
     };
     
     // Create test files
@@ -214,7 +214,7 @@ fn collectFilesRecursive(allocator: std.mem.Allocator, dir_path: []const u8, fil
 
 ```zig
 pub fn atomicFileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
-    const original_content = "Important data that must be handled atomically\n" ** 50;
+    const original_content = "Important data that must be handled atomically\n";
     
     // Create original file
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = "important_data.txt", .data = original_content });
@@ -268,7 +268,7 @@ pub fn backupAndCompress(allocator: std.mem.Allocator, file_path: []const u8, io
     std.debug.print("Backing up and compressing: {s}\n", .{file_path});
     
     // Create test file if it doesn't exist
-    const test_content = "This is test content for backup and compression example.\n" ** 100;
+    const test_content = "This is test content for backup and compression example.\n";
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = file_path, .data = test_content });
     
     // Create backup filename
@@ -345,7 +345,7 @@ pub fn backupExample(allocator: std.mem.Allocator, io: std.Io) !void {
 
 ```zig
 pub fn fileIntegrityExample(allocator: std.mem.Allocator, io: std.Io) !void {
-    const original_content = "File integrity verification test content.\n" ** 75;
+    const original_content = "File integrity verification test content.\n";
     
     // Create and compress file
     const compressed = try archive.compress(allocator, original_content, .zstd);
@@ -423,12 +423,12 @@ pub fn filteredFileCompression(allocator: std.mem.Allocator, io: std.Io) !void {
     try std.Io.Dir.cwd().makeDir(io, "project/docs");
     
     const test_files = [_]struct { path: []const u8, content: []const u8 }{
-        .{ .path = "project/src/main.zig", .content = "const std = @import(\"std\");\n" ** 20 },
-        .{ .path = "project/src/utils.zig", .content = "pub fn helper() void {}\n" ** 15 },
-        .{ .path = "project/build/output.exe", .content = "BINARY_DATA" ** 100 },
-        .{ .path = "project/build/temp.tmp", .content = "TEMP_DATA" ** 50 },
-        .{ .path = "project/docs/README.md", .content = "# Project Documentation\n" ** 30 },
-        .{ .path = "project/debug.log", .content = "DEBUG LOG ENTRY\n" ** 40 },
+        .{ .path = "project/src/main.zig", .content = "const std = @import(\"std\");\n" },
+        .{ .path = "project/src/utils.zig", .content = "pub fn helper() void {}\n" },
+        .{ .path = "project/build/output.exe", .content = "BINARY_DATA" },
+        .{ .path = "project/build/temp.tmp", .content = "TEMP_DATA" },
+        .{ .path = "project/docs/README.md", .content = "# Project Documentation\n" },
+        .{ .path = "project/debug.log", .content = "DEBUG LOG ENTRY\n" },
     };
     
     // Create test files
@@ -522,9 +522,9 @@ pub fn filteredFileCompression(allocator: std.mem.Allocator, io: std.Io) !void {
 ```zig
 pub fn robustFileProcessing(allocator: std.mem.Allocator, io: std.Io) !void {
     const test_files = [_]struct { name: []const u8, content: []const u8, should_fail: bool }{
-        .{ .name = "good_file.txt", .content = "Good file content\n" ** 50, .should_fail = false },
+        .{ .name = "good_file.txt", .content = "Good file content\n", .should_fail = false },
         .{ .name = "empty_file.txt", .content = "", .should_fail = true },
-        .{ .name = "large_file.txt", .content = "Large file content\n" ** 1000, .should_fail = false },
+        .{ .name = "large_file.txt", .content = "Large file content\n", .should_fail = false },
     };
     
     // Create test files

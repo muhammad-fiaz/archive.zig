@@ -5,7 +5,7 @@ import llmstxt from "vitepress-plugin-llms";
 export const SITE_URL = "https://muhammad-fiaz.github.io/archive.zig";
 export const SITE_NAME = "Archive.zig";
 export const SITE_DESCRIPTION =
-  "All in One archive/compression library for Zig. High-performance compression with support for multiple algorithms including gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, and zip formats.";
+  "All in One archive/compression library for Zig. High-performance compression with support for multiple algorithms including gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, and brotli formats.";
 
 // Google Analytics and Google Tag Manager IDs
 export const GA_ID = "G-6BVYCRK57P";
@@ -16,7 +16,7 @@ export const ADSENSE_CLIENT_ID = "ca-pub-2040560600290490";
 
 // SEO Keywords
 export const KEYWORDS =
-  "zig, archive, compression, gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, library, high-performance, cross-platform, streaming, file operations";
+  "zig, archive, compression, gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, brotli, library, high-performance, cross-platform, streaming, file operations";
 
 export default defineConfig({
   lang: "en-US",

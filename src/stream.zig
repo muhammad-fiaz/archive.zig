@@ -1,6 +1,5 @@
 const std = @import("std");
 const config = @import("config.zig");
-const build_options = @import("build_options");
 
 fn dispatchCompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, options: config.Options, data: []const u8) ![]u8 {
     const algorithms = @import("archive.zig").algorithms;
@@ -14,22 +13,10 @@ fn dispatchCompress(allocator: std.mem.Allocator, algorithm: config.Algorithm, o
         .xz => algorithms.xz.compress(allocator, data, options),
         .tar_gz => algorithms.tar_gz.compress(allocator, data, options),
         .zip => algorithms.zip.compress(allocator, data, options),
-        .zstd => {
-            if (comptime build_options.zstd_enabled) {
-                return algorithms.zstd.compress(allocator, data, options);
-            } else {
-                return error.UnsupportedAlgorithm;
-            }
-        },
+        .zstd => algorithms.zstd.compress(allocator, data, options),
         .raw_deflate => algorithms.deflate.compress(allocator, data, options),
         .lzma2 => algorithms.lzma.compress(allocator, data, options),
-        .brotli => {
-            if (comptime build_options.brotli_enabled) {
-                return algorithms.brotli.compress(allocator, data, options);
-            } else {
-                return error.UnsupportedAlgorithm;
-            }
-        },
+        .brotli => algorithms.brotli.compress(allocator, data, options),
     };
 }
 
@@ -45,25 +32,21 @@ fn dispatchDecompress(allocator: std.mem.Allocator, algorithm: config.Algorithm,
         .xz => algorithms.xz.decompress(allocator, data, options),
         .tar_gz => algorithms.tar_gz.decompress(allocator, data, options),
         .zip => algorithms.zip.decompress(allocator, data, options),
-        .zstd => {
-            if (comptime build_options.zstd_enabled) {
-                return algorithms.zstd.decompress(allocator, data, options);
-            } else {
-                return error.UnsupportedAlgorithm;
-            }
-        },
+        .zstd => algorithms.zstd.decompress(allocator, data, options),
         .raw_deflate => algorithms.deflate.decompress(allocator, data, options),
         .lzma2 => algorithms.lzma.decompress(allocator, data, options),
-        .brotli => {
-            if (comptime build_options.brotli_enabled) {
-                return algorithms.brotli.decompress(allocator, data, options);
-            } else {
-                return error.UnsupportedAlgorithm;
-            }
-        },
+        .brotli => algorithms.brotli.decompress(allocator, data, options),
     };
 }
 
+/// Buffered one-shot streaming adapter.
+///
+/// `CompressStream` accumulates input written via `write()` and performs a
+/// single compression pass in `finish()`. This keeps the interface uniform
+/// across all algorithms but does **not** provide constant-memory streaming:
+/// peak memory grows with the total input size. For inputs that do not fit
+/// comfortably in memory, prefer file-based chunk processing with explicit
+/// output limits instead of this adapter.
 pub const CompressStream = struct {
     allocator: std.mem.Allocator,
     algorithm: config.Algorithm,
@@ -87,11 +70,27 @@ pub const CompressStream = struct {
         try self.buffer.appendSlice(self.allocator, data);
     }
 
+    /// Number of input bytes buffered so far.
+    pub fn bufferedLen(self: *const CompressStream) usize {
+        return self.buffer.items.len;
+    }
+
+    /// Discards buffered input without compressing.
+    pub fn reset(self: *CompressStream) void {
+        self.buffer.clearRetainingCapacity();
+    }
+
+    /// Compresses all buffered input. The caller owns the returned slice.
+    /// The stream remains usable after `finish()`; buffered input is retained
+    /// so repeated `finish()` calls re-compress the same data.
     pub fn finish(self: *CompressStream) ![]u8 {
         return dispatchCompress(self.allocator, self.algorithm, config.Options{ .level = self.level.toInt() }, self.buffer.items);
     }
 };
 
+/// Buffered decompression adapter with the same memory characteristics as
+/// `CompressStream`: input is accumulated via `write()` and decoded in one
+/// pass by `finish()`.
 pub const DecompressStream = struct {
     allocator: std.mem.Allocator,
     algorithm: config.Algorithm,
@@ -113,6 +112,17 @@ pub const DecompressStream = struct {
         try self.buffer.appendSlice(self.allocator, data);
     }
 
+    /// Number of input bytes buffered so far.
+    pub fn bufferedLen(self: *const DecompressStream) usize {
+        return self.buffer.items.len;
+    }
+
+    /// Discards buffered input without decompressing.
+    pub fn reset(self: *DecompressStream) void {
+        self.buffer.clearRetainingCapacity();
+    }
+
+    /// Decompresses all buffered input. The caller owns the returned slice.
     pub fn finish(self: *DecompressStream) ![]u8 {
         return dispatchDecompress(self.allocator, self.algorithm, config.Options{}, self.buffer.items);
     }

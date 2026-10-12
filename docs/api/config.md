@@ -13,8 +13,8 @@ pub const CompressionConfig = struct {
     algorithm: Algorithm = .none,
     level: Level = .default,
     custom_level: ?u8 = null,
-    zstd_level: ?c_int = null,
-    lz4_level: ?c_int = null,
+    zstd_level: ?i32 = null,
+    lz4_level: ?i32 = null,
     extension: []const u8 = "",
     mode: CompressionMode = .compress,
     checksum: bool = false,
@@ -77,8 +77,11 @@ All `with*` methods return a new copy (builder pattern):
 |--------|-------------|
 | `withLevel(level: Level)` | Set preset level (`.none`, `.fastest`, `.fast`, `.default`, `.best`, `.ultra`) |
 | `withCustomLevel(level: u8)` | Set exact numeric level (clamped to algorithm range) |
-| `withZstdLevel(level: c_int)` | Set Zstd-specific level (1–22) |
-| `withLz4Level(level: c_int)` | Set LZ4-specific level (1–12) |
+| `withZstdLevel(level: i32)` | Set Zstd-specific level (1-22, clamped) |
+| `withLz4Level(level: i32)` | Set LZ4-specific level (1-12, clamped) |
+| `withCheckedLevel(level: u8)` | Set exact level, returning an error when out of range  |
+| `withCheckedZstdLevel(level: i32)` | Set Zstd level, returning an error when out of range  |
+| `withBrotliQuality(quality: u8)` | Set Brotli quality 0-11, returning an error when out of range |
 
 ### Mode / Integrity Methods
 
@@ -97,7 +100,7 @@ All `with*` methods return a new copy (builder pattern):
 | `withBufferSize(size: usize)` | Set all buffer sizes (read + write) |
 | `withReadBufferSize(size: usize)` | Set read buffer size |
 | `withWriteBufferSize(size: usize)` | Set write buffer size |
-| `withMemoryLevel(level: u8)` | Set memory level (1–9) |
+| `withMemoryLevel(level: u8)` | Set memory level (1-9, clamped) |
 
 ### Window / Strategy Methods
 
@@ -165,10 +168,11 @@ All `with*` methods return a new copy (builder pattern):
 | Method | Description |
 |--------|-------------|
 | `getEffectiveLevel() u8` | Returns the numeric level in effect |
-| `getEffectiveZstdLevel() c_int` | Returns the effective Zstd level |
-| `getEffectiveLz4Level() c_int` | Returns the effective LZ4 level |
+| `getEffectiveZstdLevel() i32` | Returns the effective Zstd level |
+| `getEffectiveLz4Level() i32` | Returns the effective LZ4 level |
 | `shouldIncludePath(path, is_directory) bool` | Check if path passes filters |
-| `isValidForAlgorithm() bool` | Validate config for the chosen algorithm |
+| `isValidForAlgorithm() bool` | Non-strict check for the chosen algorithm  |
+| `validate() !void` | Strict validation: rejects invalid or unsupported combinations |
 | `optimize() CompressionConfig` | Auto-optimize settings (e.g., thread job sizes for Zstd) |
 
 ## Supported Types

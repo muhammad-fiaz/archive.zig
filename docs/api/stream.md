@@ -4,7 +4,10 @@ title: Stream API
 
 # Stream API
 
-The Stream API provides `CompressStream` and `DecompressStream` for accumulating data in chunks and producing the final compressed/decompressed output.
+The Stream API provides `CompressStream` and `DecompressStream`: buffered
+adapters that accumulate input chunks via `write()` and encode/decode in a
+single pass when `finish()` is called. Peak memory grows with the total
+input size; they do not provide constant-memory streaming.
 
 ## CompressStream
 
@@ -18,6 +21,8 @@ pub const CompressStream = struct {
     pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm, level: Level) !CompressStream
     pub fn deinit(self: *CompressStream) void
     pub fn write(self: *CompressStream, data: []const u8) !void
+    pub fn bufferedLen(self: *const CompressStream) usize
+    pub fn reset(self: *CompressStream) void
     pub fn finish(self: *CompressStream) ![]u8
 };
 ```
@@ -59,11 +64,14 @@ Compresses all buffered data and returns the result. The caller owns the returne
 ```zig
 pub const DecompressStream = struct {
     allocator: std.mem.Allocator,
+    algorithm: Algorithm,
     buffer: std.ArrayList(u8),
 
-    pub fn init(allocator: std.mem.Allocator) DecompressStream
+    pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) DecompressStream
     pub fn deinit(self: *DecompressStream) void
     pub fn write(self: *DecompressStream, data: []const u8) !void
+    pub fn bufferedLen(self: *const DecompressStream) usize
+    pub fn reset(self: *DecompressStream) void
     pub fn finish(self: *DecompressStream) ![]u8
 };
 ```
@@ -71,10 +79,11 @@ pub const DecompressStream = struct {
 ### `init`
 
 ```zig
-pub fn init(allocator: std.mem.Allocator) DecompressStream
+pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) DecompressStream
 ```
 
-Creates a new `DecompressStream`. The algorithm is auto-detected from the data header when `finish` is called.
+Creates a new `DecompressStream` for the given algorithm. The caller must
+specify the algorithm explicitly; it is not auto-detected from the data.
 
 ### `deinit`
 
@@ -98,7 +107,7 @@ Appends compressed data to the internal buffer.
 pub fn finish(self: *DecompressStream) ![]u8
 ```
 
-Decompresses all buffered data, auto-detecting the format. Returns decompressed data.
+Decompresses all buffered data with the stream's algorithm. Returns decompressed data (caller owns memory).
 
 ## Examples
 
@@ -127,7 +136,7 @@ pub fn streamExample(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn decompressStreamExample(allocator: std.mem.Allocator, compressed: []const u8) !void {
-    var stream = archive.stream.DecompressStream.init(allocator);
+    var stream = archive.stream.DecompressStream.init(allocator, .gzip);
     defer stream.deinit();
 
     try stream.write(compressed);

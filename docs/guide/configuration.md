@@ -33,6 +33,26 @@ config.withCustomLevel(7)
 config.withZstdLevel(19)
 ```
 
+### Validation
+
+`withCustomLevel`, `withZstdLevel`, and `withLz4Level` clamp out-of-range
+values into the algorithm's range. When invalid input must surface as an
+error instead, use the strict builders and `validate()`:
+
+```zig
+// Rejects out-of-range levels instead of clamping them.
+const strict = try archive.CompressionConfig.init(.gzip).withCheckedLevel(6);
+const strict_zstd = try archive.CompressionConfig.init(.zstd).withCheckedZstdLevel(15);
+const quality = try archive.CompressionConfig.init(.brotli).withBrotliQuality(9);
+
+// Rejects invalid combinations: zero buffers, threads > 1 on non-zstd
+// algorithms, dictionaries on unsupported formats, min > max file size.
+try config.validate();
+
+// One-shot compress/decompress validate the configuration before dispatch.
+const compressed = try archive.compressWithConfig(allocator, data, config);
+```
+
 ## Advanced Configuration
 
 ### File Filtering

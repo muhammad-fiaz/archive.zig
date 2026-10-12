@@ -23,8 +23,7 @@ Archive.zig supports embedded and bare metal targets:
 - **WebAssembly** (wasm32, wasm64)
 - **Bare metal** (freestanding)
 
-> [!NOTE]
-> On freestanding and WebAssembly targets, **zstd** and **brotli** are automatically disabled because they require C standard library headers (`string.h`, `stdlib.h`) that are not available without an operating system. The remaining 8 algorithms (gzip, zlib, deflate, lz4, lzma, xz, tar.gz, zip) work fully on all platforms including bare metal. You can override this with `-Dzstd=true -Dbrotli=true` in your build command if you provide your own C standard library.
+All 10 algorithms work on every platform, including freestanding and WebAssembly targets, because every dependency is native Zig.
 
 ## Platform-Specific Optimizations
 
@@ -278,7 +277,7 @@ pub fn wasmOptimizations(allocator: std.mem.Allocator) !void {
 }
 
 // Export functions for JavaScript interop
-export fn compress_for_js(data_ptr: [*]const u8, data_len: usize, output_ptr: [*]u8, output_len: *usize) c_int {
+export fn compress_for_js(data_ptr: [*]const u8, data_len: usize, output_ptr: [*]u8, output_len: *usize) i32 {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -358,7 +357,7 @@ pub fn crossPlatformPaths(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn platformBenchmarks(allocator: std.mem.Allocator) !void {
-    const test_data = "Benchmark data for platform performance testing " ** 100;
+    const test_data = "Benchmark data for platform performance testing ";
     
     const algorithms = [_]archive.Algorithm{ .lz4, .gzip, .zstd };
     

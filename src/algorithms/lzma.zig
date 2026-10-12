@@ -1,3 +1,10 @@
+//! LZMA framing notes: the 13-byte header (properties byte, dictionary
+//! size, unpacked size) follows the LZMA-alone layout, but the payload uses
+//! this library's internal literal/match codec, not range-coded LZMA.
+//! Rationale: `std.compress.lzma` in Zig 0.17.0 ships a `Decompress` decoder
+//! only and no encoder, so a std-based roundtrip is not available. The
+//! codec below is self-consistent (compress/decompress round-trip) with
+//! bounded match search (32-chain cap) and single-pass linear decode.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");
@@ -261,4 +268,39 @@ test "lzma empty data" {
     defer testing.allocator.free(decompressed);
 
     try testing.expectEqualStrings(data, decompressed);
+}
+
+test "lzma levels and binary data" {
+    const testing = std.testing;
+
+    var data: [8192]u8 = undefined;
+    for (&data, 0..) |*b, i| b.* = @intCast((i * 31 + 7) % 256);
+
+    for ([_]u8{ 1, 6, 9 }) |level| {
+        const compressed = try compress(testing.allocator, &data, .{ .level = level });
+        defer testing.allocator.free(compressed);
+
+        // Header: properties byte, dictionary size, unpacked size.
+        try testing.expect(compressed.len >= 13);
+        try testing.expect(compressed[0] == constants.LzmaConstants.properties_byte);
+
+        const decompressed = try decompress(testing.allocator, compressed, .{});
+        defer testing.allocator.free(decompressed);
+
+        try testing.expectEqualSlices(u8, &data, decompressed);
+    }
+}
+
+test "lzma rejects truncated input" {
+    const testing = std.testing;
+
+    const data = "truncate me: hello world hello world hello world hello world";
+    const compressed = try compress(testing.allocator, data, .{});
+    defer testing.allocator.free(compressed);
+
+    const half = compressed[0 .. compressed.len / 2];
+    if (decompress(testing.allocator, half, .{})) |ok| {
+        testing.allocator.free(ok);
+        try testing.expect(false);
+    } else |_| {}
 }

@@ -144,28 +144,54 @@ const compressed = try archive.compress(allocator, data, .xz);
 **Best for**: Unix/Linux file archives, directory compression
 
 ```zig
+// One-shot: wraps data as a single TAR entry, then gzips it.
 const compressed = try archive.compress(allocator, data, .tar_gz);
 ```
 
 **Characteristics**:
-- Combines TAR archiving with gzip compression
-- Preserves file metadata and directory structure
-- Standard format for Unix systems
-- Good for multiple files
+- Real TAR archive (ustar headers, file names, modes, mtimes) inside the
+  gzip layer; TAR construction and gzip framing are separate steps.
+- Preserves file metadata and directory structure.
+- Standard format for Unix systems.
+
+**Multi-entry archives**:
+```zig
+const entries = [_]archive.algorithms.tar_gz.TarEntry{
+    .{ .name = "hello.txt", .data = "Hello!" },
+    .{ .name = "docs/readme.txt", .data = "Readme." },
+};
+const packed = try archive.algorithms.tar_gz.pack(allocator, &entries, .{});
+defer allocator.free(packed);
+const parsed = try archive.algorithms.tar_gz.unpack(allocator, packed, .{});
+defer archive.algorithms.tar_gz.freeEntries(allocator, parsed);
+```
 
 ### ZIP - Cross-Platform Archives
 
 **Best for**: Cross-platform archives, Windows compatibility
 
 ```zig
+// One-shot: packs data as a single ZIP entry, then parses it back.
 const compressed = try archive.compress(allocator, data, .zip);
 ```
 
 **Characteristics**:
-- Universal archive format
-- Supports multiple files and directories
-- Built-in compression and metadata
-- Compatible with all operating systems
+- Real ZIP archive (local headers, central directory, EOCD, CRC32 per
+  entry) with store or deflate per entry; never a raw deflate stream.
+- Supports multiple files with entry boundaries and checksums.
+- Compatible with all operating systems.
+
+**Multi-entry archives**:
+```zig
+const entries = [_]archive.algorithms.zip.ZipEntryData{
+    .{ .name = "hello.txt", .data = "Hello!" },
+    .{ .name = "blob.bin", .data = bytes, .method = .Store },
+};
+const packed = try archive.algorithms.zip.pack(allocator, &entries, .{});
+defer allocator.free(packed);
+const parsed = try archive.algorithms.zip.unpackAll(allocator, packed);
+defer archive.algorithms.zip.freeUnpacked(allocator, parsed);
+```
 
 ### Brotli - Modern Web Compression
 
@@ -247,7 +273,7 @@ Here's a typical performance comparison on text data:
 
 ```zig
 pub fn comparePerformance(allocator: std.mem.Allocator) !void {
-    const test_data = "Lorem ipsum dolor sit amet..." ** 1000;
+    const test_data = "Lorem ipsum dolor sit amet...";
     
     const algorithms = [_]struct { algo: archive.Algorithm, name: []const u8 }{
         .{ .algo = .lz4, .name = "LZ4" },

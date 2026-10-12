@@ -56,7 +56,7 @@ pub fn stepByStepBuilder(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn zstdBuilderExample(allocator: std.mem.Allocator) !void {
-    const input = "ZSTD builder pattern example " ** 50;
+    const input = "ZSTD builder pattern example ";
     
     // Fast ZSTD configuration
     const fast_config = archive.CompressionConfig.init(.zstd)
@@ -100,7 +100,7 @@ pub fn zstdBuilderExample(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn lz4BuilderExample(allocator: std.mem.Allocator) !void {
-    const input = "LZ4 builder pattern example " ** 30;
+    const input = "LZ4 builder pattern example ";
     
     // Ultra-fast LZ4 configuration
     const ultra_fast = archive.CompressionConfig.init(.lz4)
@@ -280,7 +280,7 @@ pub fn customFilterRulesBuilder(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn speedOptimizedBuilder(allocator: std.mem.Allocator) !void {
-    const input = "Speed optimization test data " ** 100;
+    const input = "Speed optimization test data ";
     
     // Ultra-fast configuration
     const speed_config = archive.CompressionConfig.init(.lz4)
@@ -308,7 +308,7 @@ pub fn speedOptimizedBuilder(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn sizeOptimizedBuilder(allocator: std.mem.Allocator) !void {
-    const input = "Size optimization test data with repetitive patterns " ** 50;
+    const input = "Size optimization test data with repetitive patterns ";
     
     // Maximum compression configuration
     const size_config = archive.CompressionConfig.init(.lzma)
@@ -337,7 +337,7 @@ pub fn sizeOptimizedBuilder(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn balancedBuilder(allocator: std.mem.Allocator) !void {
-    const input = "Balanced optimization test data " ** 75;
+    const input = "Balanced optimization test data ";
     
     // Balanced configuration
     const balanced_config = archive.CompressionConfig.init(.zstd)
@@ -480,7 +480,7 @@ pub fn dataDrivenBuilder(allocator: std.mem.Allocator, data: []const u8) !archiv
 
 // Helper functions for data analysis
 fn calculateEntropy(data: []const u8) f64 {
-    var counts: [256]usize = [_]usize{0} ** 256;
+    var counts: [256]usize = @splat(@as(usize, 0));
     for (data) |byte| {
         counts[byte] += 1;
     }
@@ -513,9 +513,9 @@ fn calculateRepetitionRatio(data: []const u8) f64 {
 
 pub fn dataDrivenBuilderExample(allocator: std.mem.Allocator) !void {
     const test_cases = [_]struct { name: []const u8, data: []const u8 }{
-        .{ .name = "Repetitive", .data = "AAAAAAAAAA" ** 1000 },
-        .{ .name = "Text", .data = "The quick brown fox jumps over the lazy dog. " ** 100 },
-        .{ .name = "Random", .data = &[_]u8{0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0} ** 1000 },
+        .{ .name = "Repetitive", .data = "AAAAAAAAAA" },
+        .{ .name = "Text", .data = "The quick brown fox jumps over the lazy dog. " },
+        .{ .name = "Random", .data = &[_]u8{ 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0 } },
     };
     
     for (test_cases) |test_case| {

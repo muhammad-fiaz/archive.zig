@@ -25,7 +25,7 @@ features:
     details: Support for 10 compression formats - gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, and brotli.
   - icon: 🌊
     title: Streaming Support
-    details: Memory-efficient streaming compression and decompression for large files and real-time data.
+    details: Chunked input assembly with a uniform interface across all algorithms.
   - icon: 🎯
     title: Explicit API
     details: Clean, intuitive API with builder pattern support - always specify your algorithm explicitly.
@@ -84,10 +84,12 @@ pub fn main(init: std.process.Init) !void {
 
 ## Installation
 
-Add Archive.zig to your project with Zig's package manager:
+Add Archive.zig to your project with Zig's package manager. The `zstd` and
+`brotli` dependencies are native-Zig packages, so only the Zig compiler
+is required.
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.3.tar.gz
 ```
 
 Then add to your `build.zig`:

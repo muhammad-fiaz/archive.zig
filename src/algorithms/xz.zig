@@ -1,3 +1,10 @@
+//! XZ container notes: stream magic, flags CRC, block header, data CRC,
+//! index, and footer follow the XZ layout with real CRC32 values, but block
+//! payloads use this library's internal LZMA-family codec rather than
+//! range-coded LZMA2. Rationale: `std.compress.xz` in Zig 0.17.0 ships a
+//! `Decompress` decoder only and no encoder. Decompression parses our own
+//! container (single-pass, bounded) and rejects foreign/malformed streams
+//! instead of misdecoding them.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");
@@ -203,4 +210,55 @@ test "xz empty data" {
     defer testing.allocator.free(decompressed);
 
     try testing.expectEqualStrings(data, decompressed);
+}
+
+test "xz multi chunk large data" {
+    const testing = std.testing;
+
+    // Larger than one 32 KiB LZMA2 chunk: exercises the chunk loop,
+    // per-chunk headers, and the stream terminator end to end.
+    const base = "0123456789ABCDEFabcdef";
+    const total = base.len * 4000;
+    const data = try testing.allocator.alloc(u8, total);
+    defer testing.allocator.free(data);
+    for (0..4000) |i| @memcpy(data[i * base.len .. (i + 1) * base.len], base);
+
+    const compressed = try compress(testing.allocator, data, .{ .level = 9 });
+    defer testing.allocator.free(compressed);
+
+    try testing.expect(std.mem.startsWith(u8, compressed, &constants.Magic.xz));
+
+    const decompressed = try decompress(testing.allocator, compressed, .{});
+    defer testing.allocator.free(decompressed);
+
+    try testing.expectEqualSlices(u8, data, decompressed);
+}
+
+test "xz binary data" {
+    const testing = std.testing;
+
+    var data: [4096]u8 = undefined;
+    for (&data, 0..) |*b, i| b.* = @intCast((i * 31 + 7) % 256);
+
+    const compressed = try compress(testing.allocator, &data, .{});
+    defer testing.allocator.free(compressed);
+
+    const decompressed = try decompress(testing.allocator, compressed, .{});
+    defer testing.allocator.free(decompressed);
+
+    try testing.expectEqualSlices(u8, &data, decompressed);
+}
+
+test "xz rejects truncated input" {
+    const testing = std.testing;
+
+    const data = "truncate me: hello world hello world hello world hello world";
+    const compressed = try compress(testing.allocator, data, .{});
+    defer testing.allocator.free(compressed);
+
+    const half = compressed[0 .. compressed.len / 2];
+    if (decompress(testing.allocator, half, .{})) |ok| {
+        testing.allocator.free(ok);
+        try testing.expect(false);
+    } else |_| {}
 }

@@ -1,6 +1,10 @@
 # Streaming
 
-Archive.zig provides streaming interfaces for memory-efficient compression and decompression of large files and real-time data processing.
+> `CompressStream` and `DecompressStream` are buffered adapters: `write()`
+> accumulates input chunks and `finish()` encodes/decodes in a single pass.
+> Peak memory grows with the total input size, so they do not provide
+> constant-memory streaming. For data that does not fit comfortably in
+> memory, process bounded file chunks with explicit output limits instead.
 
 ## Stream Interface
 
@@ -36,7 +40,7 @@ pub fn streamExample(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn streamDecompressExample(allocator: std.mem.Allocator, compressed_data: []const u8) !void {
-    var decompressor = archive.stream.DecompressStream.init(allocator);
+    var decompressor = archive.stream.DecompressStream.init(allocator, .gzip);
     defer decompressor.deinit();
     
     // Process compressed data in chunks
@@ -112,7 +116,7 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, input_path: []con
     const output_file = try std.Io.Dir.cwd().createFile(io, output_path, .{});
     defer output_file.close();
     
-    var decompressor = archive.stream.DecompressStream.init(allocator);
+    var decompressor = archive.stream.DecompressStream.init(allocator, algorithm);
     defer decompressor.deinit();
     
     var buffer: [64 * 1024]u8 = undefined;

@@ -3,7 +3,7 @@
   <h1> Archive.zig</h1> 
 
   <a href="https://muhammad-fiaz.github.io/archive.zig/"><img src="https://img.shields.io/badge/docs-muhammad--fiaz.github.io-blue" alt="Documentation"></a>
-  <a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.16.0-orange.svg?logo=zig" alt="Zig Version"></a>
+  <a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.17.0-orange.svg?logo=zig" alt="Zig Version"></a>
   <a href="https://github.com/muhammad-fiaz/archive.zig"><img src="https://img.shields.io/github/stars/muhammad-fiaz/archive.zig" alt="GitHub stars"></a>
   <a href="https://github.com/muhammad-fiaz/archive.zig/issues"><img src="https://img.shields.io/github/issues/muhammad-fiaz/archive.zig" alt="GitHub issues"></a>
   <a href="https://github.com/muhammad-fiaz/archive.zig/pulls"><img src="https://img.shields.io/github/issues-pr/muhammad-fiaz/archive.zig" alt="GitHub pull requests"></a>
@@ -92,7 +92,7 @@ Before installing Archive.zig, ensure you have the following:
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| **Zig** | 0.16.0+ | Download from [ziglang.org](https://ziglang.org/download/) |
+| **Zig** | 0.17.0+ | Download from [ziglang.org](https://ziglang.org/download/) |
 | **Operating System** | Windows 10+, Linux, macOS | Cross-platform support |
 | **Memory** | 64MB+ available | For compression operations |
 
@@ -109,10 +109,9 @@ Archive.zig supports a wide range of platforms and architectures:
 | **Windows** | x86_64, x86 | Full support |
 | **Linux** | x86_64, x86, aarch64 | Full support |
 | **macOS** | x86_64, aarch64 (Apple Silicon) | Full support |
-| **Bare Metal / Freestanding** | x86_64, aarch64, arm, riscv64, wasm32 | 8 algorithms (see note) |
+| **Bare Metal / Freestanding** | x86_64, aarch64, arm, riscv64, wasm32 | Full support (all 10 algorithms) |
 
-> [!NOTE]
-> On freestanding and WebAssembly targets, **zstd** and **brotli** are automatically disabled because they require C standard library headers (`string.h`, `stdlib.h`) that are not available without an operating system. The remaining 8 algorithms (gzip, zlib, deflate, lz4, lzma, xz, tar.gz, zip) work fully on all platforms. You can override this with `-Dzstd=true -Dbrotli=true` if you provide your own C standard library.
+All 10 algorithms work on every platform, including freestanding and WebAssembly targets, because every dependency is native Zig.
 
 ---
 
@@ -142,7 +141,7 @@ Archive.zig supports a wide range of platforms and architectures:
 The easiest way to add Archive.zig to your project:
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.3.tar.gz
 ```
 
 This automatically adds the dependency with the correct hash to your `build.zig.zon`.
@@ -154,7 +153,7 @@ Add to your `build.zig.zon`:
 ```zig
 .dependencies = .{
     .archive = .{
-        .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz",
+        .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.3.tar.gz",
         .hash = "...", // Run zig fetch to get the hash
     },
 },
@@ -331,6 +330,10 @@ pub fn fileOperations(allocator: std.mem.Allocator, io: std.Io) !void {
 
 ### Streaming Interface
 
+> The streaming types are buffered adapters: `write()` accumulates input
+> chunks and `finish()` encodes/decodes in one pass. Peak memory grows with
+> total input size; they do not provide constant-memory streaming.
+
 ```zig
 const stream = archive.stream;
 
@@ -440,8 +443,8 @@ pub const CompressionConfig = struct {
     algorithm: Algorithm,
     level: Level,
     custom_level: ?u8,
-    zstd_level: ?c_int,
-    lz4_level: ?c_int,
+    zstd_level: ?i32,
+    lz4_level: ?i32,
     checksum: bool,
     mode: CompressionMode,
     path_filter: PathFilter,
@@ -457,8 +460,8 @@ pub const CompressionConfig = struct {
     pub fn init(algorithm: Algorithm) CompressionConfig
     pub fn withLevel(self: CompressionConfig, level: Level) CompressionConfig
     pub fn withCustomLevel(self: CompressionConfig, level: u8) CompressionConfig
-    pub fn withZstdLevel(self: CompressionConfig, level: c_int) CompressionConfig
-    pub fn withLz4Level(self: CompressionConfig, level: c_int) CompressionConfig
+    pub fn withZstdLevel(self: CompressionConfig, level: i32) CompressionConfig
+    pub fn withLz4Level(self: CompressionConfig, level: i32) CompressionConfig
     pub fn withChecksum(self: CompressionConfig) CompressionConfig
     pub fn withMode(self: CompressionConfig, mode: CompressionMode) CompressionConfig
     pub fn withDictionary(self: CompressionConfig, dict: []const u8) CompressionConfig
@@ -472,7 +475,26 @@ pub const CompressionConfig = struct {
     pub fn withFollowSymlinks(self: CompressionConfig) CompressionConfig
     pub fn withMaxDepth(self: CompressionConfig, depth: u32) CompressionConfig
     pub fn withSizeRange(self: CompressionConfig, min_size: u64, max_size: ?u64) CompressionConfig
+    // Strict builders reject out-of-range values instead of clamping them
+    pub fn withCheckedLevel(self: CompressionConfig, level: u8) !CompressionConfig
+    pub fn withCheckedZstdLevel(self: CompressionConfig, level: i32) !CompressionConfig
+    pub fn withBrotliQuality(self: CompressionConfig, quality: u8) !CompressionConfig
+    // Rejects invalid or unsupported combinations (bad buffers, threads on
+    // non-zstd algorithms, dictionaries on unsupported formats, ...)
+    pub fn validate(self: CompressionConfig) !void
 };
+```
+
+### Versions and Capabilities
+
+```zig
+pub const version = "0.0.3";              // library release
+pub const minimum_zig_version = "0.17.0"; // minimum compiler
+
+// Ownership: every compress/decompress variant returns an owned slice.
+// Free it with the same allocator; inputs are always borrowed.
+const compressed = try archive.compress(allocator, input, .gzip);
+defer allocator.free(compressed);
 ```
 
 ## Building

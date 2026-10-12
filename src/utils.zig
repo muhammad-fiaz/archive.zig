@@ -121,7 +121,7 @@ pub fn matchGlobWithCase(name: []const u8, pattern: []const u8, case_sensitive: 
         return if (case_sensitive)
             std.mem.indexOf(u8, name, suffix) != null
         else
-            std.ascii.indexOfIgnoreCase(name, suffix) != null;
+            std.ascii.findIgnoreCase(name, suffix) != null;
     }
 
     if (std.mem.endsWith(u8, pattern, "/**")) {

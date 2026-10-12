@@ -1,3 +1,5 @@
+//! Raw deflate implemented entirely on `std.compress.flate` (both
+//! `Compress` and `Decompress`), which Zig 0.17.0 ships in both directions.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");
@@ -84,7 +86,7 @@ test "deflate empty data" {
 test "deflate repetitive data" {
     const testing = std.testing;
 
-    const data = "AAAAAAAAAAAAAAAA" ** 10;
+    const data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const compressed = try compress(testing.allocator, data, .{});
     defer testing.allocator.free(compressed);
 

@@ -1,5 +1,15 @@
 const std = @import("std");
 
+/// Library release version. Keep in sync with `build.zig.zon`.
+pub const library_version = "0.0.3";
+/// Minimum supported Zig compiler version.
+pub const minimum_zig_version = "0.17.0";
+/// Integrated dependency versions (verified against `build.zig.zon` hashes).
+pub const DependencyVersions = struct {
+    pub const zstd = "0.0.4";
+    pub const brotli = "0.0.4";
+};
+
 pub const TimeConstants = struct {
     pub const ns_per_us: u64 = std.time.ns_per_us;
     pub const ns_per_ms: u64 = std.time.ns_per_ms;
@@ -65,18 +75,18 @@ pub const Lz4Constants = struct {
     pub const max_offset: usize = 65535;
     pub const hash_bits: u5 = 16;
     pub const hash_size: usize = 1 << hash_bits;
-    pub const min_level: c_int = 1;
-    pub const max_level: c_int = 12;
-    pub const default_level: c_int = 1;
-    pub const acceleration_default: c_int = 1;
-    pub const acceleration_max: c_int = 65537;
+    pub const min_level: i32 = 1;
+    pub const max_level: i32 = 12;
+    pub const default_level: i32 = 1;
+    pub const acceleration_default: i32 = 1;
+    pub const acceleration_max: i32 = 65537;
 };
 
 pub const ZstdConstants = struct {
-    pub const default_level: c_int = 3;
-    pub const min_level: c_int = 1;
-    pub const max_level: c_int = 22;
-    pub const ultra_min_level: c_int = 20;
+    pub const default_level: i32 = 3;
+    pub const min_level: i32 = 1;
+    pub const max_level: i32 = 22;
+    pub const ultra_min_level: i32 = 20;
     pub const window_log_min: u8 = 10;
     pub const window_log_max: u8 = 31;
     pub const hash_log_min: u8 = 6;

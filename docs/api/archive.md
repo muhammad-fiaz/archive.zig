@@ -169,12 +169,14 @@ pub const Compressor = struct {
     allocator: std.mem.Allocator,
     algorithm: Algorithm,
     level: ?u8 = null,
-    zstd_level: ?c_int = null,
+    zstd_level: ?i32 = null,
+    lz4_level: ?i32 = null,
     checksum: bool = false,
 
     pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) Compressor
     pub fn withLevel(self: Compressor, level: u8) Compressor
-    pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+    pub fn withZstdLevel(self: Compressor, level: i32) Compressor
+    pub fn withLz4Level(self: Compressor, level: i32) Compressor
     pub fn withChecksum(self: Compressor) Compressor
     pub fn compress_data(self: Compressor, data: []const u8) ![]u8
     pub fn decompress_data(self: Compressor, data: []const u8) ![]u8
@@ -202,10 +204,18 @@ Sets the compression level (0-9 for most algorithms).
 ### `withZstdLevel`
 
 ```zig
-pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+pub fn withZstdLevel(self: Compressor, level: i32) Compressor
 ```
 
 Sets the Zstandard-specific compression level (1-22).
+
+### `withLz4Level`
+
+```zig
+pub fn withLz4Level(self: Compressor, level: i32) Compressor
+```
+
+Sets the LZ4-specific compression level (1-12).
 
 ### `withChecksum`
 
@@ -248,3 +258,12 @@ defer allocator.free(decompressed);
 ## Error Handling
 
 All functions return `CompressError` for various failure conditions. See [Errors](./errors.md) for the full error set.
+
+## Versions
+
+```zig
+pub const version = "0.0.3";
+pub const minimum_zig_version = "0.17.0";
+```
+
+All 10 algorithms are always compiled in, on every target.

@@ -4,8 +4,16 @@ This guide covers different ways to install and integrate Archive.zig into your 
 
 ## Prerequisites
 
-- **Zig 0.16.0** or later
-- No external dependencies required
+- **Zig 0.17.0** or later
+- No manual dependency setup: `brotli.zig` 0.0.4 and `zstd.zig` 0.0.4 are
+  declared in `build.zig.zon` and fetched automatically by the Zig package
+  manager.
+
+### Native-Zig dependencies
+
+Both compression dependencies are native-Zig packages: only the Zig
+compiler is required to build this library. Level settings use the `i32`
+type (e.g. `withZstdLevel(level: i32)`).
 
 ## Package Manager (Recommended)
 
@@ -14,7 +22,7 @@ The easiest way to add Archive.zig to your project is using Zig's built-in packa
 ### Stable Release
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.3.tar.gz
 ```
 
 ### Latest Development Version
@@ -40,7 +48,7 @@ Add Archive.zig to your project's `build.zig.zon`:
     .version = "0.1.0",
     .dependencies = .{
         .archive = .{
-            .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.2.tar.gz",
+            .url = "https://github.com/muhammad-fiaz/archive.zig/archive/refs/tags/0.0.3.tar.gz",
             .hash = "1220...", // Run zig fetch to get the correct hash
         },
     },
@@ -169,7 +177,7 @@ If you get a hash mismatch error:
 
 If you encounter build errors:
 
-1. Ensure you're using Zig 0.16.0 or later:
+1. Ensure you're using Zig 0.17.0 or later:
    ```bash
    zig version
    ```
