@@ -199,6 +199,19 @@ test "unified roundtrip all enabled algorithms" {
     }
 }
 
+test "unified roundtrip aliases none and lzma2" {
+    const testing = std.testing;
+    const input = "Alias coverage: none passes through, lzma2 maps to lzma.";
+
+    for ([_]Algorithm{ .none, .lzma2 }) |algo| {
+        const compressed = try compress(testing.allocator, input, algo);
+        defer testing.allocator.free(compressed);
+        const decompressed = try decompress(testing.allocator, compressed, algo);
+        defer testing.allocator.free(decompressed);
+        try testing.expectEqualStrings(input, decompressed);
+    }
+}
+
 test "unified roundtrip binary with zero bytes" {
     const testing = std.testing;
     var input: [256]u8 = undefined;

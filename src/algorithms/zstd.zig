@@ -3,11 +3,6 @@ const config = @import("../config.zig");
 const errors = @import("../errors.zig");
 const zstd = @import("zstd");
 
-/// Library version of the integrated zstd.zig dependency.
-pub const dependency_version = zstd.version;
-/// Data-format specification implemented by the dependency (Zstandard v1.6.0).
-pub const spec_version = "1.6.0";
-
 fn effectiveLevel(options: config.Options) i32 {
     if (options.zstd_level) |l| return std.math.clamp(l, 1, 22);
     if (options.level) |l| return std.math.clamp(@as(i32, l), 1, 22);
@@ -116,6 +111,6 @@ test "zstd invalid data" {
 
 test "zstd dependency version" {
     const testing = std.testing;
-    try testing.expectEqualStrings("0.0.4", dependency_version);
+    try testing.expectEqualStrings("0.0.4", zstd.version);
     try testing.expect(zstd.maxCLevel() >= 22);
 }

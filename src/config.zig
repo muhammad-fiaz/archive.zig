@@ -627,7 +627,6 @@ pub const CompressionConfig = struct {
     ///
     /// Caller owns nothing extra; returns an error on the first problem found.
     pub fn validate(self: CompressionConfig) !void {
-        if (self.algorithm == .none) return error.UnsupportedAlgorithm;
         if (!self.isValidForAlgorithm()) return error.InvalidData;
         if (self.buffer_size == 0) return error.InvalidData;
         if (self.read_buffer_size == 0 or self.write_buffer_size == 0) return error.InvalidData;
@@ -781,7 +780,6 @@ pub const Options = struct {
     /// levels, nonzero thread counts on single-threaded backends, dictionaries
     /// on algorithms without dictionary support, and zero buffer sizes.
     pub fn validate(self: Options, algorithm: Algorithm) !void {
-        if (algorithm == .none) return error.UnsupportedAlgorithm;
         if (self.buffer_size == 0) return error.InvalidData;
         if (self.threads == 0) return error.InvalidData;
         if (self.threads > 1 and algorithm != .zstd) return error.UnsupportedAlgorithm;

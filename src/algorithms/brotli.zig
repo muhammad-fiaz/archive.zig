@@ -3,11 +3,6 @@ const config = @import("../config.zig");
 const errors = @import("../errors.zig");
 const brotli = @import("brotli");
 
-/// Library version of the integrated brotli.zig dependency (pure Zig, no libc).
-pub const dependency_version = brotli.version;
-/// Wire-format specification implemented by the dependency.
-pub const spec_version = brotli.spec_version;
-
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
     if (data.len == 0) return allocator.alloc(u8, 0);
 
