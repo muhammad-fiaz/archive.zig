@@ -34,7 +34,7 @@ Try different algorithms to see which works best for your data:
 
 ```zig
 const algorithms = [_]archive.Algorithm{ .gzip, .zlib, .zstd, .lz4 };
-const input = "Your data here " ** 10;
+const input = "Your data here ";
 
 for (algorithms) |algo| {
     const compressed = try archive.compress(allocator, input, algo);

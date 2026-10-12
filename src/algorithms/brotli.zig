@@ -3,20 +3,36 @@ const config = @import("../config.zig");
 const errors = @import("../errors.zig");
 const brotli = @import("brotli");
 
+/// Library version of the integrated brotli.zig dependency (pure Zig, no libc).
+pub const dependency_version = brotli.version;
+/// Wire-format specification implemented by the dependency.
+pub const spec_version = brotli.spec_version;
+
 pub fn compress(allocator: std.mem.Allocator, data: []const u8, options: config.Options) ![]u8 {
     if (data.len == 0) return allocator.alloc(u8, 0);
 
-    const quality: u4 = if (options.level) |lvl| @intCast(@min(lvl, 11)) else 6;
+    const quality: u32 = if (options.level) |lvl| @min(@as(u32, lvl), 11) else 6;
+    if (options.dictionary) |_| return error.UnsupportedAlgorithm;
 
-    return brotli.compressWithOptions(allocator, data, .{
-        .quality = quality,
-    }) catch return errors.CompressError.InternalFailure;
+    var opts = brotli.CompressionOptions{ .quality = quality };
+    if (options.window_size) |ws| {
+        const lg = std.math.log2_int(usize, @max(ws, 1024));
+        opts.lgWin = @intCast(@min(@max(lg, 10), 24));
+    }
+
+    return brotli.compressWithOptions(allocator, data, opts) catch |err| switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        else => errors.CompressError.InternalFailure,
+    };
 }
 
 pub fn decompress(allocator: std.mem.Allocator, data: []const u8, _: config.Options) ![]u8 {
     if (data.len == 0) return allocator.alloc(u8, 0);
 
-    return brotli.decompress(allocator, data) catch return errors.CompressError.InvalidData;
+    return brotli.decompress(allocator, data) catch |err| switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        else => errors.CompressError.InvalidData,
+    };
 }
 
 test "brotli compress and decompress" {
@@ -48,7 +64,7 @@ test "brotli empty data" {
 test "brotli repetitive data" {
     const testing = std.testing;
 
-    const data = "AAAAAAAAAAAAAAAA" ** 10;
+    const data = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const compressed = try compress(testing.allocator, data, .{});
     defer testing.allocator.free(compressed);
 

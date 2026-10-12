@@ -109,11 +109,12 @@ GNU zip format with CRC32 checksum.
 
 ### `zstd`
 
-Zstandard — modern algorithm with excellent speed/ratio.
+Zstandard — modern algorithm with excellent speed/ratio. Powered by the
+native-Zig `zstd.zig` 0.0.4 package.
 
 - **Extension:** `.zst`
 - **Magic Bytes:** `28 B5 2F FD`
-- **Levels:** 1–22 (default 3, ultra 20–22)
+- **Levels:** 1-22 (default 3, ultra 20-22)
 - **Best for:** General purpose, real-time, archival
 
 ### `lzma`
@@ -169,11 +170,12 @@ LZ4 frame format — extremely fast.
 
 ### `brotli`
 
-Brotli compression — modern algorithm optimized for web content.
+Brotli compression — modern algorithm optimized for web content. Powered
+by the native-Zig `brotli.zig` 0.0.4 package.
 
 - **Extension:** `.br`
 - **Magic Bytes:** `CE B2 CF 81`
-- **Levels:** 0–11 (default 6)
+- **Levels:** 0-11 (default 6)
 - **Best for:** Web content, HTTP compression
 
 ## Comparison Table

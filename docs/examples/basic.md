@@ -35,7 +35,7 @@ Compare different algorithms on the same data:
 
 ```zig
 pub fn compareAlgorithms(allocator: std.mem.Allocator) !void {
-    const input = "This is a test string for compression comparison. " ** 10;
+    const input = "This is a test string for compression comparison. ";
     
     const algorithms = [_]struct { algo: archive.Algorithm, name: []const u8 }{
         .{ .algo = .gzip, .name = "gzip" },

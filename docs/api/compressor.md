@@ -13,12 +13,14 @@ pub const Compressor = struct {
     allocator: std.mem.Allocator,
     algorithm: Algorithm,
     level: ?u8 = null,
-    zstd_level: ?c_int = null,
+    zstd_level: ?i32 = null,
+    lz4_level: ?i32 = null,
     checksum: bool = false,
 
     pub fn init(allocator: std.mem.Allocator, algorithm: Algorithm) Compressor
     pub fn withLevel(self: Compressor, level: u8) Compressor
-    pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+    pub fn withZstdLevel(self: Compressor, level: i32) Compressor
+    pub fn withLz4Level(self: Compressor, level: i32) Compressor
     pub fn withChecksum(self: Compressor) Compressor
     pub fn compress_data(self: Compressor, data: []const u8) ![]u8
     pub fn decompress_data(self: Compressor, data: []const u8) ![]u8
@@ -46,10 +48,18 @@ Returns a copy with the compression level set. The level is clamped to the algor
 ### `withZstdLevel`
 
 ```zig
-pub fn withZstdLevel(self: Compressor, level: c_int) Compressor
+pub fn withZstdLevel(self: Compressor, level: i32) Compressor
 ```
 
-Returns a copy with the Zstandard-specific level set (1–22).
+Returns a copy with the Zstandard-specific level set (1-22).
+
+### `withLz4Level`
+
+```zig
+pub fn withLz4Level(self: Compressor, level: i32) Compressor
+```
+
+Returns a copy with the LZ4-specific level set (1-12).
 
 ### `withChecksum`
 
@@ -102,7 +112,7 @@ pub fn zstdExample(allocator: std.mem.Allocator) !void {
         .withZstdLevel(15)
         .withChecksum();
 
-    const data = "Repetitive data for high compression " ** 100;
+    const data = "Repetitive data for high compression ";
 
     const compressed = try compressor.compress_data(data);
     defer allocator.free(compressed);

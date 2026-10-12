@@ -335,7 +335,7 @@ fn isRandomData(data: []const u8) bool {
     if (data.len < 256) return false;
     
     // Simple entropy check - count unique bytes
-    var byte_counts: [256]u32 = [_]u32{0} ** 256;
+    var byte_counts: [256]u32 = @splat(@as(u32, 0));
     for (data[0..@min(256, data.len)]) |byte| {
         byte_counts[byte] += 1;
     }

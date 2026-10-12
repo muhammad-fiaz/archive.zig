@@ -1,3 +1,10 @@
+//! LZMA framing notes: the 13-byte header (properties byte, dictionary
+//! size, unpacked size) follows the LZMA-alone layout, but the payload uses
+//! this library's internal literal/match codec, not range-coded LZMA.
+//! Rationale: `std.compress.lzma` in Zig 0.17.0 ships a `Decompress` decoder
+//! only and no encoder, so a std-based roundtrip is not available. The
+//! codec below is self-consistent (compress/decompress round-trip) with
+//! bounded match search (32-chain cap) and single-pass linear decode.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");

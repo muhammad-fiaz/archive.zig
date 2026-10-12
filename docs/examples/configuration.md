@@ -34,10 +34,10 @@ pub fn basicConfig(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn zstdLevels(allocator: std.mem.Allocator) !void {
-    const input = "ZSTD level testing data " ** 10;
+    const input = "ZSTD level testing data ";
     
     // Test different ZSTD compression levels
-    const levels = [_]c_int{ 1, 3, 6, 10, 15, 19, 22 };
+    const levels = [_]i32{ 1, 3, 6, 10, 15, 19, 22 };
     
     std.debug.print("ZSTD Compression Levels:\n");
     for (levels) |level| {
@@ -167,7 +167,7 @@ pub fn directoryTraversal(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn performanceTuning(allocator: std.mem.Allocator) !void {
-    const input = "Performance tuning test data " ** 100;
+    const input = "Performance tuning test data ";
     
     // Different performance configurations
     const configs = [_]struct { config: archive.CompressionConfig, name: []const u8 }{
@@ -209,7 +209,7 @@ pub fn performanceTuning(allocator: std.mem.Allocator) !void {
 
 ```zig
 pub fn compressionStrategies(allocator: std.mem.Allocator) !void {
-    const input = "Strategy testing data with various patterns and repetitions " ** 5;
+    const input = "Strategy testing data with various patterns and repetitions ";
     
     // Test different compression strategies
     const strategies = [_]struct { strategy: archive.Strategy, name: []const u8 }{

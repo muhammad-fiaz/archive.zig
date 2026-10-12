@@ -453,7 +453,7 @@ pub fn numaAwareCompression(allocator: std.mem.Allocator) !void {
     
     // Create test data for each thread
     for (0..optimal_threads) |i| {
-        const data = try std.fmt.allocPrint(allocator, "NUMA-aware thread {d} data " ** 100, .{i});
+        const data = try std.fmt.allocPrint(allocator, "NUMA-aware thread {d} data ", .{i});
         defer allocator.free(data);
         
         threads[i] = try std.Thread.spawn(.{}, numaWorker, .{ data, &results[i] });

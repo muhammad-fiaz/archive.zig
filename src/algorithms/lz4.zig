@@ -1,3 +1,8 @@
+//! LZ4 framing notes: the container carries the standard LZ4 frame magic
+//! with LZ4 block token/literal/match coding. Zig 0.17.0's `std.compress`
+//! ships no LZ4 support, so both directions are implemented here: a
+//! single-pass hash-chain compressor and a bounded single-pass decoder
+//! with offset/length validation.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");

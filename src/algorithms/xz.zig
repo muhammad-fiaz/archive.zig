@@ -1,3 +1,10 @@
+//! XZ container notes: stream magic, flags CRC, block header, data CRC,
+//! index, and footer follow the XZ layout with real CRC32 values, but block
+//! payloads use this library's internal LZMA-family codec rather than
+//! range-coded LZMA2. Rationale: `std.compress.xz` in Zig 0.17.0 ships a
+//! `Decompress` decoder only and no encoder. Decompression parses our own
+//! container (single-pass, bounded) and rejects foreign/malformed streams
+//! instead of misdecoding them.
 const std = @import("std");
 const config = @import("../config.zig");
 const errors = @import("../errors.zig");

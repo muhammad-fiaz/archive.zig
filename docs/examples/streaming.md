@@ -1,6 +1,6 @@
 # Streaming Examples
 
-This page demonstrates practical streaming compression and decompression examples for memory-efficient processing of large files and real-time data.
+This page demonstrates practical streaming compression and decompression examples using the buffered stream adapters (`write()` accumulates chunks, `finish()` encodes/decodes in one pass).
 
 ## Basic Streaming Operations
 
@@ -23,16 +23,17 @@ pub fn basicStreamCompression(allocator: std.mem.Allocator) !void {
         "Final chunk to complete the data.",
     };
     
-    std.debug.print("Basic stream compression:\n");
-    
+    std.debug.print("Basic stream compression:\n", .{});
+
+    var total_input: usize = 0;
     for (chunks) |chunk| {
         total_input += chunk.len;
         try compressor.write(chunk);
     }
-    
+
     const compressed = try compressor.finish();
     defer allocator.free(compressed);
-    total_output = compressed.len;
+    const total_output = compressed.len;
     
     std.debug.print("  Total: {d} -> {d} bytes ({d:.1}%)\n", .{ total_input, total_output, @as(f64, @floatFromInt(total_output)) / @as(f64, @floatFromInt(total_input)) * 100 });
 }
@@ -43,12 +44,12 @@ pub fn basicStreamCompression(allocator: std.mem.Allocator) !void {
 ```zig
 pub fn basicStreamDecompression(allocator: std.mem.Allocator) !void {
     // First, create some compressed data
-    const original_data = "This is test data for stream decompression example. " ** 20;
+    const original_data = "This is test data for stream decompression example. ";
     const compressed_data = try archive.compress(allocator, original_data, .zstd);
     defer allocator.free(compressed_data);
     
-    // Now decompress it using streaming
-    var decompressor = try archive.stream.DecompressStream.init(allocator);
+    // Now decompress it using streaming (algorithm must be specified)
+    var decompressor = archive.stream.DecompressStream.init(allocator, .zstd);
     defer decompressor.deinit();
     
     std.debug.print("Stream decompression:\n");
@@ -171,7 +172,7 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, io: std.Io) !void
     const decompressed_file = "decompressed_large.txt";
     
     // Create original file
-    const test_content = "Large file decompression test content line.\n" ** 5000;
+    const test_content = "Large file decompression test content line.\n";
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = original_file, .data = test_content });
     
     // Compress it first
@@ -189,8 +190,9 @@ pub fn streamDecompressLargeFile(allocator: std.mem.Allocator, io: std.Io) !void
     
     const output_file = try std.Io.Dir.cwd().createFile(io, decompressed_file, .{});
     defer output_file.close();
-    
-    var decompressor = try archive.stream.DecompressStream.init(allocator);
+
+    // Data was compressed with .lz4 above; the algorithm must be specified.
+    var decompressor = archive.stream.DecompressStream.init(allocator, .lz4);
     defer decompressor.deinit();
     
     var buffer: [32 * 1024]u8 = undefined; // 32KB buffer
@@ -439,7 +441,7 @@ pub fn memoryEfficientStreaming(allocator: std.mem.Allocator, io: std.Io) !void 
     const output_file = "memory_test_output.lz4";
     
     // Generate test content
-    const content = "Memory efficient streaming test content line.\n" ** 2000;
+    const content = "Memory efficient streaming test content line.\n";
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = input_file, .data = content });
     
     // Process with minimal memory usage
@@ -510,7 +512,7 @@ pub fn robustStreamProcessing(allocator: std.mem.Allocator) !void {
     const test_cases = [_]struct { name: []const u8, data: []const u8, should_fail: bool }{
         .{ .name = "Normal data", .data = "Normal streaming data content", .should_fail = false },
         .{ .name = "Empty data", .data = "", .should_fail = false },
-        .{ .name = "Large data", .data = "Large data content " ** 100, .should_fail = false },
+        .{ .name = "Large data", .data = "Large data content ", .should_fail = false },
     };
     
     for (test_cases) |test_case| {

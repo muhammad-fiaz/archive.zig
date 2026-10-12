@@ -5,49 +5,29 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const is_freestanding = target.result.os.tag == .freestanding;
-    const is_wasm = target.result.cpu.arch == .wasm32 or target.result.cpu.arch == .wasm64 or target.result.os.tag == .wasi;
+    const zstd_dep = b.dependency("zstd", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zstd_mod = zstd_dep.module("zstd");
 
-    const zstd_enabled = b.option(bool, "zstd", "Enable Zstandard support") orelse (!is_freestanding and !is_wasm);
-    const brotli_enabled = b.option(bool, "brotli", "Enable Brotli support") orelse (!is_freestanding and !is_wasm);
-
-    const build_options = b.addOptions();
-    build_options.addOption(bool, "zstd_enabled", zstd_enabled);
-    build_options.addOption(bool, "brotli_enabled", brotli_enabled);
-    const build_options_mod = build_options.createModule();
-
-    var zstd_mod: ?*std.Build.Module = null;
-    var brotli_mod: ?*std.Build.Module = null;
-
-    if (zstd_enabled) {
-        const zstd_dep = b.dependency("zstd", .{
-            .target = target,
-            .optimize = optimize,
-        });
-        zstd_mod = zstd_dep.module("zstd");
-    }
-
-    if (brotli_enabled) {
-        const brotli_dep = b.dependency("brotli", .{
-            .target = target,
-            .optimize = optimize,
-        });
-        brotli_mod = brotli_dep.module("brotli");
-    }
+    const brotli_dep = b.dependency("brotli", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const brotli_mod = brotli_dep.module("brotli");
 
     const archive_module = b.createModule(.{
         .root_source_file = b.path("src/archive.zig"),
     });
-    archive_module.addImport("build_options", build_options_mod);
-    if (zstd_mod) |mod| archive_module.addImport("zstd", mod);
-    if (brotli_mod) |mod| archive_module.addImport("brotli", mod);
+    archive_module.addImport("zstd", zstd_mod);
+    archive_module.addImport("brotli", brotli_mod);
 
     const exposed_module = b.addModule("archive", .{
         .root_source_file = b.path("src/archive.zig"),
     });
-    exposed_module.addImport("build_options", build_options_mod);
-    if (zstd_mod) |mod| exposed_module.addImport("zstd", mod);
-    if (brotli_mod) |mod| exposed_module.addImport("brotli", mod);
+    exposed_module.addImport("zstd", zstd_mod);
+    exposed_module.addImport("brotli", brotli_mod);
 
     const examples = [_]struct { name: []const u8, path: []const u8, skip_run_all: bool = false }{
         .{ .name = "main", .path = "examples/main.zig" },
@@ -68,7 +48,6 @@ pub fn build(b: *std.Build) void {
             }),
         });
         exe.root_module.addImport("archive", archive_module);
-        exe.root_module.addImport("build_options", build_options_mod);
 
         const install_exe = b.addInstallArtifact(exe, .{});
         const example_step = b.step("example-" ++ example.name, "Build " ++ example.name ++ " example");
@@ -110,9 +89,8 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    tests.root_module.addImport("build_options", build_options_mod);
-    if (zstd_mod) |mod| tests.root_module.addImport("zstd", mod);
-    if (brotli_mod) |mod| tests.root_module.addImport("brotli", mod);
+    tests.root_module.addImport("zstd", zstd_mod);
+    tests.root_module.addImport("brotli", brotli_mod);
 
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run unit tests");
@@ -133,9 +111,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    docs_obj.root_module.addImport("build_options", build_options_mod);
-    if (zstd_mod) |mod| docs_obj.root_module.addImport("zstd", mod);
-    if (brotli_mod) |mod| docs_obj.root_module.addImport("brotli", mod);
+    docs_obj.root_module.addImport("zstd", zstd_mod);
+    docs_obj.root_module.addImport("brotli", brotli_mod);
 
     const install_docs = b.addInstallDirectory(.{
         .source_dir = docs_obj.getEmittedDocs(),
@@ -157,8 +134,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    lib.root_module.addImport("build_options", build_options_mod);
-    if (zstd_mod) |mod| lib.root_module.addImport("zstd", mod);
-    if (brotli_mod) |mod| lib.root_module.addImport("brotli", mod);
+    lib.root_module.addImport("zstd", zstd_mod);
+    lib.root_module.addImport("brotli", brotli_mod);
     b.installArtifact(lib);
 }

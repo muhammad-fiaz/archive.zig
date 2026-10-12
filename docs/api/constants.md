@@ -93,11 +93,11 @@ pub const Lz4Constants = struct {
     pub const max_offset: usize = 65535;
     pub const hash_bits: u5 = 16;
     pub const hash_size: usize = 1 << 16;
-    pub const min_level: c_int = 1;
-    pub const max_level: c_int = 12;
-    pub const default_level: c_int = 1;
-    pub const acceleration_default: c_int = 1;
-    pub const acceleration_max: c_int = 65537;
+    pub const min_level: i32 = 1;
+    pub const max_level: i32 = 12;
+    pub const default_level: i32 = 1;
+    pub const acceleration_default: i32 = 1;
+    pub const acceleration_max: i32 = 65537;
 };
 ```
 
@@ -105,10 +105,10 @@ pub const Lz4Constants = struct {
 
 ```zig
 pub const ZstdConstants = struct {
-    pub const default_level: c_int = 3;
-    pub const min_level: c_int = 1;
-    pub const max_level: c_int = 22;
-    pub const ultra_min_level: c_int = 20;
+    pub const default_level: i32 = 3;
+    pub const min_level: i32 = 1;
+    pub const max_level: i32 = 22;
+    pub const ultra_min_level: i32 = 20;
     pub const window_log_min: u8 = 10;
     pub const window_log_max: u8 = 31;
     pub const hash_log_min: u8 = 6;

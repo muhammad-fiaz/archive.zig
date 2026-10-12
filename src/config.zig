@@ -96,7 +96,7 @@ pub const Level = enum {
         };
     }
 
-    pub fn toZstdLevel(self: Level) c_int {
+    pub fn toZstdLevel(self: Level) i32 {
         return switch (self) {
             .none => 0,
             .fastest => 1,
@@ -107,7 +107,7 @@ pub const Level = enum {
         };
     }
 
-    pub fn toLz4Level(self: Level) c_int {
+    pub fn toLz4Level(self: Level) i32 {
         return switch (self) {
             .none => 0,
             .fastest => 1,
@@ -192,8 +192,8 @@ pub const CompressionConfig = struct {
     algorithm: Algorithm = .none,
     level: Level = .default,
     custom_level: ?u8 = null,
-    zstd_level: ?c_int = null,
-    lz4_level: ?c_int = null,
+    zstd_level: ?i32 = null,
+    lz4_level: ?i32 = null,
     extension: []const u8 = "",
     mode: CompressionMode = .compress,
 
@@ -272,13 +272,13 @@ pub const CompressionConfig = struct {
         return cfg;
     }
 
-    pub fn withZstdLevel(self: CompressionConfig, level: c_int) CompressionConfig {
+    pub fn withZstdLevel(self: CompressionConfig, level: i32) CompressionConfig {
         var cfg = self;
         cfg.zstd_level = std.math.clamp(level, Constants.ZstdConstants.min_level, Constants.ZstdConstants.max_level);
         return cfg;
     }
 
-    pub fn withLz4Level(self: CompressionConfig, level: c_int) CompressionConfig {
+    pub fn withLz4Level(self: CompressionConfig, level: i32) CompressionConfig {
         var cfg = self;
         cfg.lz4_level = std.math.clamp(level, 1, 12);
         return cfg;
@@ -584,13 +584,13 @@ pub const CompressionConfig = struct {
         return self.level.toInt();
     }
 
-    pub fn getEffectiveZstdLevel(self: CompressionConfig) c_int {
+    pub fn getEffectiveZstdLevel(self: CompressionConfig) i32 {
         if (self.zstd_level) |l| return l;
         if (self.custom_level) |l| return @intCast(l);
         return self.level.toZstdLevel();
     }
 
-    pub fn getEffectiveLz4Level(self: CompressionConfig) c_int {
+    pub fn getEffectiveLz4Level(self: CompressionConfig) i32 {
         if (self.lz4_level) |l| return l;
         if (self.custom_level) |l| return @intCast(l);
         return self.level.toLz4Level();
@@ -619,6 +619,65 @@ pub const CompressionConfig = struct {
         }
 
         return true;
+    }
+
+    /// Strict validation that rejects invalid or unsupported configuration
+    /// instead of silently clamping. Call before compression when the caller
+    /// must be told about bad input rather than having it adjusted quietly.
+    ///
+    /// Caller owns nothing extra; returns an error on the first problem found.
+    pub fn validate(self: CompressionConfig) !void {
+        if (self.algorithm == .none) return error.UnsupportedAlgorithm;
+        if (!self.isValidForAlgorithm()) return error.InvalidData;
+        if (self.buffer_size == 0) return error.InvalidData;
+        if (self.read_buffer_size == 0 or self.write_buffer_size == 0) return error.InvalidData;
+        if (self.max_file_size) |max| {
+            if (max < self.min_file_size) return error.InvalidData;
+        }
+        if (self.window_size) |ws| {
+            if (ws == 0) return error.InvalidData;
+        }
+        if (self.threads == 0) return error.InvalidData;
+        if (self.threads > 1 and self.algorithm != .zstd) return error.UnsupportedAlgorithm;
+        if (self.dictionary) |dict| {
+            switch (self.algorithm) {
+                .zstd, .brotli, .gzip, .zlib, .deflate, .raw_deflate => {
+                    if (dict.len == 0) return error.InvalidData;
+                    if (dict.len > Constants.CompressionLimits.max_dictionary_size) return error.OutputTooLarge;
+                },
+                else => return error.UnsupportedAlgorithm,
+            }
+        }
+        if (self.memory_level) |ml| {
+            if (ml < 1 or ml > 9) return error.InvalidData;
+        }
+    }
+
+    /// Builder that rejects out-of-range levels instead of clamping them.
+    /// Use when invalid input must surface as an error.
+    pub fn withCheckedLevel(self: CompressionConfig, level: u8) !CompressionConfig {
+        const max_level = self.algorithm.getMaxLevel();
+        const min_level = self.algorithm.getMinLevel();
+        if (level < min_level or level > max_level) return error.InvalidData;
+        var cfg = self;
+        cfg.custom_level = level;
+        return cfg;
+    }
+
+    /// Builder that rejects out-of-range Zstandard levels instead of clamping.
+    pub fn withCheckedZstdLevel(self: CompressionConfig, level: i32) !CompressionConfig {
+        if (level < Constants.ZstdConstants.min_level or level > Constants.ZstdConstants.max_level) return error.InvalidData;
+        var cfg = self;
+        cfg.zstd_level = level;
+        return cfg;
+    }
+
+    /// Builder for Brotli quality (0..11) that rejects out-of-range values.
+    pub fn withBrotliQuality(self: CompressionConfig, quality: u8) !CompressionConfig {
+        if (quality > 11) return error.InvalidData;
+        var cfg = self;
+        cfg.custom_level = quality;
+        return cfg;
     }
 
     pub fn optimize(self: CompressionConfig) CompressionConfig {
@@ -652,8 +711,8 @@ pub const Options = struct {
     window_size: ?usize = null,
     memory_level: ?u8 = null,
     strategy: Strategy = .default,
-    zstd_level: ?c_int = null,
-    lz4_level: ?c_int = null,
+    zstd_level: ?i32 = null,
+    lz4_level: ?i32 = null,
     threads: u32 = 1,
     buffer_size: usize = Constants.BufferSizes.compression,
     flush_mode: FlushMode = .sync,
@@ -662,11 +721,11 @@ pub const Options = struct {
         return .{ .level = level };
     }
 
-    pub fn withZstdLevel(level: c_int) Options {
+    pub fn withZstdLevel(level: i32) Options {
         return .{ .zstd_level = level };
     }
 
-    pub fn withLz4Level(level: c_int) Options {
+    pub fn withLz4Level(level: i32) Options {
         return .{ .lz4_level = level };
     }
 
@@ -716,6 +775,41 @@ pub const Options = struct {
             .buffer_size = cfg.buffer_size,
             .flush_mode = cfg.flush_mode,
         };
+    }
+
+    /// Validates per-algorithm option combinations. Rejects out-of-range
+    /// levels, nonzero thread counts on single-threaded backends, dictionaries
+    /// on algorithms without dictionary support, and zero buffer sizes.
+    pub fn validate(self: Options, algorithm: Algorithm) !void {
+        if (algorithm == .none) return error.UnsupportedAlgorithm;
+        if (self.buffer_size == 0) return error.InvalidData;
+        if (self.threads == 0) return error.InvalidData;
+        if (self.threads > 1 and algorithm != .zstd) return error.UnsupportedAlgorithm;
+        if (self.level) |l| {
+            if (l < algorithm.getMinLevel() or l > algorithm.getMaxLevel()) return error.InvalidData;
+        }
+        if (self.zstd_level) |l| {
+            if (algorithm != .zstd) return error.UnsupportedAlgorithm;
+            if (l < Constants.ZstdConstants.min_level or l > Constants.ZstdConstants.max_level) return error.InvalidData;
+        }
+        if (self.lz4_level) |l| {
+            if (algorithm != .lz4) return error.UnsupportedAlgorithm;
+            if (l < 1 or l > 12) return error.InvalidData;
+        }
+        if (self.dictionary) |dict| {
+            switch (algorithm) {
+                .zstd, .brotli, .gzip, .zlib, .deflate, .raw_deflate => {
+                    if (dict.len == 0) return error.InvalidData;
+                },
+                else => return error.UnsupportedAlgorithm,
+            }
+        }
+        if (self.memory_level) |ml| {
+            if (ml < 1 or ml > 9) return error.InvalidData;
+        }
+        if (self.window_size) |ws| {
+            if (ws == 0) return error.InvalidData;
+        }
     }
 };
 

@@ -24,8 +24,13 @@ Archive.zig supports 10 different compression algorithms:
 - **zip** - Standard ZIP archive format
 - **brotli** - Modern web compression with excellent ratio
 
+### Native-Zig dependencies
+
+`zstd` and `brotli` are powered by native-Zig packages (`zstd.zig` 0.0.4
+and `brotli.zig` 0.0.4). Level settings use the `i32` type.
+
 ### 🌊 Streaming Support
-- Process large files without loading everything into memory
+- Chunked input assembly with a uniform interface across all algorithms
 - Real-time compression and decompression
 - Configurable buffer sizes for memory optimization
 - Support for incremental processing
@@ -33,7 +38,7 @@ Archive.zig supports 10 different compression algorithms:
 ### 🎯 Simple API
 - Clean, intuitive function interface
 - Builder pattern for advanced configuration
-- Automatic algorithm detection from file headers
+- Explicit algorithm selection for every operation
 - Comprehensive error handling
 
 ## Design Philosophy

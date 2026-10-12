@@ -5,8 +5,8 @@
     "": {
       "name": "archive-zig-docs",
       "devDependencies": {
-        "vitepress": "latest",
-        "vitepress-plugin-llms": "latest",
+        "vitepress": "^1.6.4",
+        "vitepress-plugin-llms": "^1.13.4",
       },
     },
   },
