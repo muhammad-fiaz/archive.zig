@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 import llmstxt from "vitepress-plugin-llms";
 
 // Site configuration
-export const SITE_URL = "https://muhammad-fiaz.github.io/archive.zig";
+export const SITE_URL = "https://muhammad-fiaz.github.io/archive.zig/";
 export const SITE_NAME = "Archive.zig";
 export const SITE_DESCRIPTION =
   "All in One archive/compression library for Zig. High-performance compression with support for multiple algorithms including gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, and brotli formats.";
