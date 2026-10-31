@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 import llmstxt from "vitepress-plugin-llms";
 
 // Site configuration
-export const SITE_URL = "https://muhammad-fiaz.github.io/archive.zig/";
+export const SITE_URL = "https://muhammad-fiaz.github.io/archive.zig";
 export const SITE_NAME = "Archive.zig";
 export const SITE_DESCRIPTION =
   "All in One archive/compression library for Zig. High-performance compression with support for multiple algorithms including gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, and brotli formats.";
@@ -18,6 +18,7 @@ export const ADSENSE_CLIENT_ID = "ca-pub-2040560600290490";
 export const KEYWORDS =
   "zig, archive, compression, gzip, zlib, deflate, zstd, lz4, lzma, xz, tar.gz, zip, brotli, library, high-performance, cross-platform, streaming, file operations";
 
+
 export default defineConfig({
   lang: "en-US",
   title: SITE_NAME,
@@ -26,7 +27,7 @@ export default defineConfig({
   lastUpdated: true,
   cleanUrls: false,
   sitemap: {
-    hostname: SITE_URL,
+    hostname: `${SITE_URL}/`,
   },
   vite: {
     plugins: [llmstxt()],
@@ -145,11 +146,6 @@ gtag('config', '${GA_ID}');`,
             {},
             `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0], j=d.createElement(s), dl=l!='dataLayer'?'&l='+l:''; j.async=true; j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl; f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${GTM_ID}');`,
           ],
-          [
-            "noscript",
-            {},
-            `<iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`,
-          ],
         ] as [string, Record<string, string>, string][])
       : []),
     // Google AdSense
@@ -161,14 +157,30 @@ gtag('config', '${GA_ID}');`,
         crossorigin: "anonymous",
       },
     ],
+    // Microsoft Clarity
+    [
+      "script",
+      {},
+      `(function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", "z5vdzih779");`,
+    ],
   ],
+
+  transformHtml(html) {
+    const noscript = `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`;
+    return html.replace(/<body([^>]*)>/, `<body$1>\n    ${noscript}`);
+  },
+
   transformPageData(pageData) {
     // Dynamic OG image generation based on page title
     const pageTitle = pageData.title || SITE_NAME;
     const pageDescription = pageData.description || SITE_DESCRIPTION;
     const canonicalUrl = `${SITE_URL}/${pageData.relativePath
-      .replace(/((^|\/)index)?\.md$/, "$2")
-      .replace(/\.md$/, "")}`;
+      .replace(/(^|\/)index\.md$/, "$1")
+      .replace(/\.md$/, ".html")}`;
 
     pageData.frontmatter.head ??= [];
     pageData.frontmatter.head.push(
@@ -288,37 +300,17 @@ gtag('config', '${GA_ID}');`,
 
     // 3. BreadcrumbList Schema
     const breadcrumbs: Record<string, unknown>[] = [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: SITE_URL,
-      },
+      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE_URL}/` },
     ];
-
     if (!isHome) {
-      const pathParts = pageData.relativePath.replace(/\.md$/, "").split("/");
-      let currentPath = SITE_URL;
-      pathParts.forEach((part, index) => {
-        currentPath += `/${part}`;
-        // Best effort capitalization
-        const name = part
-          .split("-")
-          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-          .join(" ");
-        breadcrumbs.push({
-          "@type": "ListItem",
-          position: index + 2,
-          name: name,
-          item: index === pathParts.length - 1 ? canonicalUrl : currentPath, // Ensure last item points to canonical
-        });
+      breadcrumbs.push({
+        "@type": "ListItem",
+        position: 2,
+        name: pageTitle,
+        item: canonicalUrl,
       });
     }
-
-    graph.push({
-      "@type": "BreadcrumbList",
-      itemListElement: breadcrumbs,
-    });
+    graph.push({ "@type": "BreadcrumbList", itemListElement: breadcrumbs });
 
     pageData.frontmatter.head.push([
       "script",
